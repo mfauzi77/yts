@@ -50,7 +50,9 @@ export const useYouTubePlayer = ({ videoId, isPlaying, onStateChange }: UseYouTu
                     'fs': 0,
                 },
                 events: {
-                    'onReady': () => setIsReady(true),
+                    'onReady': () => {
+                        setIsReady(true);
+                    },
                     'onStateChange': onStateChange
                 }
             });

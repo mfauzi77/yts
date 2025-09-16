@@ -12,6 +12,7 @@ import { ThemeToggle } from './components/ThemeToggle';
 import { useYouTubePlayer } from './hooks/useYouTubePlayer';
 import { NowPlayingView } from './components/NowPlayingView';
 import { ChannelView } from './components/ChannelView';
+import { FloatingPlayer } from './components/FloatingPlayer';
 
 type ActiveView = 'tabs' | 'channel';
 
@@ -27,7 +28,7 @@ const App: React.FC = () => {
     const [selectedChannel, setSelectedChannel] = useState<{ id: string; title: string } | null>(null);
     const [channelVideos, setChannelVideos] = useState<VideoItem[]>([]);
     const [isChannelLoading, setIsChannelLoading] = useState<boolean>(false);
-
+    const [isMiniPlayerVisible, setIsMiniPlayerVisible] = useState(false);
 
     const [playlist, setPlaylist] = useLocalStorage<VideoItem[]>('ytas-playlist', []);
     const [history, setHistory] = useLocalStorage<VideoItem[]>('ytas-history', []);
@@ -35,6 +36,28 @@ const App: React.FC = () => {
     const [isAutoplayEnabled, setIsAutoplayEnabled] = useLocalStorage<boolean>('ytas-autoplay', true);
 
     const currentTrackIndexInPlaylist = useRef(-1);
+    const footerRef = useRef<HTMLElement>(null);
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                // Show mini player when the main player is NOT visible (intersecting)
+                setIsMiniPlayerVisible(!entry.isIntersecting);
+            },
+            { root: null, threshold: 0.1 } // threshold means at least 10% of the element is visible
+        );
+
+        const currentFooter = footerRef.current;
+        if (currentFooter) {
+            observer.observe(currentFooter);
+        }
+
+        return () => {
+            if (currentFooter) {
+                observer.unobserve(currentFooter);
+            }
+        };
+    }, []);
 
     useEffect(() => {
         if (theme === 'dark') {
@@ -43,7 +66,7 @@ const App: React.FC = () => {
             document.documentElement.classList.remove('dark');
         }
     }, [theme]);
-
+    
     const handleSearch = useCallback(async (query: string) => {
         if (!query.trim()) return;
         setIsLoading(true);
@@ -101,7 +124,7 @@ const App: React.FC = () => {
     const { volume, setVolume, seekTo, currentTime, duration } = useYouTubePlayer({
         videoId: currentTrack?.id.videoId ?? null,
         isPlaying,
-        onStateChange: handlePlayerStateChange
+        onStateChange: handlePlayerStateChange,
     });
 
     const handleAddToPlaylist = useCallback((track: VideoItem) => {
@@ -161,7 +184,7 @@ const App: React.FC = () => {
                 <div className="container mx-auto px-4 py-3 flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                        <i className="fab fa-youtube text-brand-red text-3xl"></i>
-                        <h1 className="text-xl tracking-tight text-gray-900 dark:text-white">YTS</h1>
+                        <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">Audio Streamer</h1>
                     </div>
                     <div className="w-full max-w-lg">
                         <SearchBar onSearch={handleSearch} />
@@ -223,7 +246,7 @@ const App: React.FC = () => {
 
             {currentTrack && (
                 <>
-                    <footer className="fixed bottom-0 left-0 right-0 z-30">
+                    <footer ref={footerRef} className="fixed bottom-0 left-0 right-0 z-30">
                         <Player
                             track={currentTrack}
                             isPlaying={isPlaying}
@@ -254,6 +277,16 @@ const App: React.FC = () => {
                         isAutoplayEnabled={isAutoplayEnabled}
                         onToggleAutoplay={handleToggleAutoplay}
                     />
+                    {isMiniPlayerVisible && (
+                        <FloatingPlayer
+                            track={currentTrack}
+                            isPlaying={isPlaying}
+                            setIsPlaying={setIsPlaying}
+                            onNext={playNext}
+                            onPrev={playPrev}
+                            onClose={() => setIsMiniPlayerVisible(false)}
+                        />
+                    )}
                 </>
             )}
         </div>

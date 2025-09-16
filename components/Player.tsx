@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import type { VideoItem } from '../types';
 
@@ -41,7 +40,7 @@ export const Player: React.FC<PlayerProps> = ({
     volume,
     setVolume,
     currentTime,
-    duration
+    duration,
 }) => {
     
     const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {

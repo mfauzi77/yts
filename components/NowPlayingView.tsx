@@ -95,7 +95,7 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
                             </div>
                         </div>
 
-                        <div className="flex justify-center items-center space-x-6 my-4">
+                        <div className="flex justify-center items-center space-x-8 my-4">
                             <button
                                 onClick={onToggleAutoplay}
                                 aria-label="Toggle Autoplay"
@@ -121,6 +121,8 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
                             >
                                 <i className="fas fa-step-forward text-xl"></i>
                             </button>
+                            {/* Placeholder for spacing */}
+                            <div className="w-12 h-12"></div>
                         </div>
 
                          <div className="flex items-center space-x-3 justify-center md:justify-start mt-4">
