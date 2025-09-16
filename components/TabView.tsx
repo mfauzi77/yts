@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 
 type Tab = 'Search Results' | 'Playlist' | 'History';

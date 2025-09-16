@@ -9,6 +9,9 @@ interface YouTubePlayer {
   setVolume: (volume: number) => void;
   getVolume: () => number;
   destroy: () => void;
+  getCurrentTime: () => number;
+  getDuration: () => number;
+  seekTo: (seconds: number, allowSeekAhead: boolean) => void;
 }
 
 interface UseYouTubePlayerProps {
@@ -21,8 +24,19 @@ const YOUTUBE_API_SRC = 'https://www.youtube.com/iframe_api';
 
 export const useYouTubePlayer = ({ videoId, isPlaying, onStateChange }: UseYouTubePlayerProps) => {
     const playerRef = useRef<YouTubePlayer | null>(null);
+    const intervalRef = useRef<number | null>(null);
     const [isReady, setIsReady] = useState(false);
-    
+    const [duration, setDuration] = useState(0);
+    const [currentTime, setCurrentTime] = useState(0);
+    const [volume, setVolumeState] = useState(100);
+
+    const clearTimeInterval = () => {
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+        }
+    };
+
     const initializePlayer = useCallback(() => {
         if (window.YT && window.YT.Player) {
             playerRef.current = new window.YT.Player('player-container', {
@@ -56,9 +70,10 @@ export const useYouTubePlayer = ({ videoId, isPlaying, onStateChange }: UseYouTu
         }
 
         return () => {
+            clearTimeInterval();
             playerRef.current?.destroy();
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -69,24 +84,44 @@ export const useYouTubePlayer = ({ videoId, isPlaying, onStateChange }: UseYouTu
     
     useEffect(() => {
         if (!isReady) return;
+
+        clearTimeInterval(); // Clear any existing interval
         if (isPlaying) {
             playerRef.current?.playVideo();
+            intervalRef.current = window.setInterval(() => {
+                const newDuration = playerRef.current?.getDuration() ?? 0;
+                const newTime = playerRef.current?.getCurrentTime() ?? 0;
+                setDuration(newDuration);
+                setCurrentTime(newTime);
+            }, 500);
         } else {
             playerRef.current?.pauseVideo();
         }
+        
+        return clearTimeInterval;
     }, [isReady, isPlaying]);
     
-    const setVolume = useCallback((volume: number) => {
+    const setVolume = useCallback((newVolume: number) => {
         if (isReady) {
-            playerRef.current?.setVolume(volume);
+            playerRef.current?.setVolume(newVolume);
+            setVolumeState(newVolume);
+        }
+    }, [isReady]);
+
+    const seekTo = useCallback((seconds: number) => {
+        if (isReady) {
+            playerRef.current?.seekTo(seconds, true);
+            setCurrentTime(seconds);
         }
     }, [isReady]);
     
-    const getVolume = useCallback(() => {
-        return playerRef.current?.getVolume() ?? 100;
-    }, []);
+    useEffect(() => {
+        if(isReady) {
+            setVolumeState(playerRef.current?.getVolume() ?? 100);
+        }
+    }, [isReady]);
 
-    return { setVolume, getVolume };
+    return { setVolume, volume, seekTo, currentTime, duration };
 };
 
 declare global {

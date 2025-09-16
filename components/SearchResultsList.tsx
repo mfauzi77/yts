@@ -7,6 +7,7 @@ interface SearchResultListProps {
   isLoading: boolean;
   onSelectTrack: (track: VideoItem) => void;
   onAddToPlaylist: (track: VideoItem) => void;
+  onSelectChannel: (channelId: string, channelTitle: string) => void;
   playlist: VideoItem[];
 }
 
@@ -14,8 +15,9 @@ const SearchResultItem: React.FC<{
     item: VideoItem;
     onSelectTrack: (track: VideoItem) => void;
     onAddToPlaylist: (track: VideoItem) => void;
+    onSelectChannel: (channelId: string, channelTitle: string) => void;
     isInPlaylist: boolean;
-}> = ({ item, onSelectTrack, onAddToPlaylist, isInPlaylist }) => (
+}> = ({ item, onSelectTrack, onAddToPlaylist, onSelectChannel, isInPlaylist }) => (
     <div className="flex items-center p-3 space-x-4 bg-white dark:bg-dark-card rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-dark-surface transition-colors duration-200">
         <img
             src={item.snippet.thumbnails.default.url}
@@ -27,7 +29,12 @@ const SearchResultItem: React.FC<{
             <p className="text-sm font-semibold truncate text-gray-900 dark:text-white cursor-pointer" onClick={() => onSelectTrack(item)}>
                 {item.snippet.title}
             </p>
-            <p className="text-xs text-gray-500 dark:text-dark-subtext">{item.snippet.channelTitle}</p>
+            <p 
+                className="text-xs text-gray-500 dark:text-dark-subtext cursor-pointer hover:underline"
+                onClick={() => onSelectChannel(item.snippet.channelId, item.snippet.channelTitle)}
+            >
+                {item.snippet.channelTitle}
+            </p>
         </div>
         <div className="flex-shrink-0">
             <button
@@ -47,7 +54,7 @@ const SearchResultItem: React.FC<{
 );
 
 
-export const SearchResultList: React.FC<SearchResultListProps> = ({ results, isLoading, onSelectTrack, onAddToPlaylist, playlist }) => {
+export const SearchResultList: React.FC<SearchResultListProps> = ({ results, isLoading, onSelectTrack, onAddToPlaylist, onSelectChannel, playlist }) => {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -76,6 +83,7 @@ export const SearchResultList: React.FC<SearchResultListProps> = ({ results, isL
                 item={item}
                 onSelectTrack={onSelectTrack}
                 onAddToPlaylist={onAddToPlaylist}
+                onSelectChannel={onSelectChannel}
                 isInPlaylist={isInPlaylist}
             />
         );

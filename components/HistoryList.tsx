@@ -6,9 +6,10 @@ interface HistoryListProps {
   history: VideoItem[];
   onSelectTrack: (track: VideoItem) => void;
   onAddToPlaylist: (track: VideoItem) => void;
+  onSelectChannel: (channelId: string, channelTitle: string) => void;
 }
 
-export const HistoryList: React.FC<HistoryListProps> = ({ history, onSelectTrack, onAddToPlaylist }) => {
+export const HistoryList: React.FC<HistoryListProps> = ({ history, onSelectTrack, onAddToPlaylist, onSelectChannel }) => {
   if (history.length === 0) {
     return (
       <div className="text-center py-10 text-gray-500 dark:text-dark-subtext">
@@ -33,7 +34,12 @@ export const HistoryList: React.FC<HistoryListProps> = ({ history, onSelectTrack
             <p className="text-sm font-semibold truncate text-gray-900 dark:text-white cursor-pointer" onClick={() => onSelectTrack(item)}>
               {item.snippet.title}
             </p>
-            <p className="text-xs text-gray-500 dark:text-dark-subtext">{item.snippet.channelTitle}</p>
+            <p 
+                className="text-xs text-gray-500 dark:text-dark-subtext cursor-pointer hover:underline"
+                onClick={() => onSelectChannel(item.snippet.channelId, item.snippet.channelTitle)}
+            >
+                {item.snippet.channelTitle}
+            </p>
           </div>
           <button onClick={() => onAddToPlaylist(item)} className="p-2 rounded-full text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600 hover:text-brand-red transition-colors duration-200" title="Add to playlist">
             <i className="fas fa-plus"></i>

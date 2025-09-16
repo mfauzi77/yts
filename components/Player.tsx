@@ -1,7 +1,6 @@
 
-import React, { useEffect, useCallback, useState } from 'react';
+import React, { useEffect } from 'react';
 import type { VideoItem } from '../types';
-import { useYouTubePlayer } from '../hooks/useYouTubePlayer';
 
 interface PlayerProps {
   track: VideoItem;
@@ -9,6 +8,12 @@ interface PlayerProps {
   setIsPlaying: (isPlaying: boolean) => void;
   onNext: () => void;
   onPrev: () => void;
+  onToggleNowPlaying: () => void;
+  onSelectChannel: (channelId: string, channelTitle: string) => void;
+  volume: number;
+  setVolume: (volume: number) => void;
+  currentTime: number;
+  duration: number;
 }
 
 const AudioVisualizer: React.FC<{ isPlaying: boolean }> = ({ isPlaying }) => {
@@ -25,39 +30,22 @@ const AudioVisualizer: React.FC<{ isPlaying: boolean }> = ({ isPlaying }) => {
     );
 };
 
-export const Player: React.FC<PlayerProps> = ({ track, isPlaying, setIsPlaying, onNext, onPrev }) => {
-    const [volume, setLocalVolume] = useState(100);
-
-    const handleStateChange = useCallback((event: { data: number }) => {
-        // YT.PlayerState.ENDED is 0
-        if (event.data === 0) {
-            onNext();
-        }
-        // YT.PlayerState.PLAYING is 1
-        if (event.data === 1 && !isPlaying) {
-             setIsPlaying(true);
-        }
-        // YT.PlayerState.PAUSED is 2
-         if (event.data === 2 && isPlaying) {
-             setIsPlaying(false);
-        }
-    }, [onNext, isPlaying, setIsPlaying]);
-
-    const { setVolume, getVolume } = useYouTubePlayer({
-        videoId: track.id.videoId,
-        isPlaying,
-        onStateChange: handleStateChange
-    });
-
-    useEffect(() => {
-        setLocalVolume(getVolume());
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [track]); // Get initial volume when track changes
-
+export const Player: React.FC<PlayerProps> = ({
+    track,
+    isPlaying,
+    setIsPlaying,
+    onNext,
+    onPrev,
+    onToggleNowPlaying,
+    onSelectChannel,
+    volume,
+    setVolume,
+    currentTime,
+    duration
+}) => {
+    
     const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const newVolume = Number(e.target.value);
-        setLocalVolume(newVolume);
-        setVolume(newVolume);
+        setVolume(Number(e.target.value));
     }
     
     const handleTogglePlay = () => {
@@ -89,15 +77,32 @@ export const Player: React.FC<PlayerProps> = ({ track, isPlaying, setIsPlaying, 
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [onNext, onPrev, isPlaying]);
+    
+    const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+    const handleChannelClick = (e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent onToggleNowPlaying from firing
+        onSelectChannel(track.snippet.channelId, track.snippet.channelTitle);
+    };
 
     return (
-        <div className="bg-white/80 dark:bg-dark-surface/80 backdrop-blur-md shadow-lg p-2 border-t border-gray-200 dark:border-gray-700">
+        <div className="relative bg-white/80 dark:bg-dark-surface/80 backdrop-blur-md shadow-lg p-2 border-t border-gray-200 dark:border-gray-700">
+            <div className="absolute top-0 left-0 h-0.5 bg-brand-red" style={{ width: `${progress}%` }}></div>
             <div className="container mx-auto px-4 flex items-center justify-between">
-                <div className="flex items-center space-x-4 w-1/4">
+                <div 
+                    className="flex items-center space-x-4 w-1/4 cursor-pointer"
+                    onClick={onToggleNowPlaying}
+                    title="Open player view"
+                >
                     <img src={track.snippet.thumbnails.default.url} alt={track.snippet.title} className="w-14 h-14 rounded-md object-cover" />
                     <div>
                         <p className="font-bold text-sm truncate text-gray-900 dark:text-white">{track.snippet.title}</p>
-                        <p className="text-xs text-gray-500 dark:text-dark-subtext">{track.snippet.channelTitle}</p>
+                        <p 
+                            className="text-xs text-gray-500 dark:text-dark-subtext hover:underline"
+                            onClick={handleChannelClick}
+                        >
+                            {track.snippet.channelTitle}
+                        </p>
                     </div>
                 </div>
 
