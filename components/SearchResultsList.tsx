@@ -9,6 +9,7 @@ interface SearchResultListProps {
   onAddToPlaylist: (track: VideoItem) => void;
   onSelectChannel: (channelId: string, channelTitle: string) => void;
   playlist: VideoItem[];
+  viewType: 'search' | 'recommendations';
 }
 
 const SearchResultItem: React.FC<{
@@ -54,7 +55,7 @@ const SearchResultItem: React.FC<{
 );
 
 
-export const SearchResultList: React.FC<SearchResultListProps> = ({ results, isLoading, onSelectTrack, onAddToPlaylist, onSelectChannel, playlist }) => {
+export const SearchResultList: React.FC<SearchResultListProps> = ({ results, isLoading, onSelectTrack, onAddToPlaylist, onSelectChannel, playlist, viewType }) => {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -64,11 +65,20 @@ export const SearchResultList: React.FC<SearchResultListProps> = ({ results, isL
   }
 
   if (results.length === 0 && !isLoading) {
+    if (viewType === 'recommendations') {
+        return (
+            <div className="text-center py-10 text-gray-500 dark:text-dark-subtext">
+                <i className="fas fa-magic text-4xl mb-4"></i>
+                <p>Recommendations based on your history will appear here.</p>
+                <p className="text-sm">Listen to a song to get started.</p>
+            </div>
+        );
+    }
     return (
         <div className="text-center py-10 text-gray-500 dark:text-dark-subtext">
-            <i className="fas fa-music text-4xl mb-4"></i>
-            <p>Your search results will appear here.</p>
-            <p className="text-sm">Start by typing in the search bar above.</p>
+            <i className="fas fa-search text-4xl mb-4"></i>
+            <p>No results found for your search.</p>
+            <p className="text-sm">Try searching for something else, or clear the search bar to see recommendations.</p>
         </div>
     );
   }

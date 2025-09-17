@@ -5,7 +5,7 @@ import { TabView } from './components/TabView';
 import { SearchResultList } from './components/SearchResultsList';
 import { Playlist } from './components/Playlist';
 import { HistoryList } from './components/HistoryList';
-import { searchVideos, getChannelVideos } from './services/youtubeService';
+import { searchVideos, getChannelVideos, getRelatedVideos } from './services/youtubeService';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import type { VideoItem } from './types';
 import { ThemeToggle } from './components/ThemeToggle';
@@ -17,10 +17,13 @@ import { FloatingPlayer } from './components/FloatingPlayer';
 type ActiveView = 'tabs' | 'channel';
 
 const App: React.FC = () => {
-    const [searchResults, setSearchResults] = useState<VideoItem[]>([]);
+    const [searchResults, setSearchResults] = useState<VideoItem[] | null>(null);
+    const [recommendations, setRecommendations] = useState<VideoItem[]>([]);
+    const [isSearchLoading, setIsSearchLoading] = useState<boolean>(false);
+    const [isRecommendationsLoading, setIsRecommendationsLoading] = useState<boolean>(true);
+
     const [currentTrack, setCurrentTrack] = useState<VideoItem | null>(null);
     const [isPlaying, setIsPlaying] = useState<boolean>(false);
-    const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [isNowPlayingViewOpen, setIsNowPlayingViewOpen] = useState(false);
     
@@ -38,13 +41,17 @@ const App: React.FC = () => {
     const currentTrackIndexInPlaylist = useRef(-1);
     const footerRef = useRef<HTMLElement>(null);
 
+    const handleApiError = (err: unknown) => {
+        const message = err instanceof Error ? err.message : 'An unknown error occurred.';
+        setError(message);
+    };
+
     useEffect(() => {
         const observer = new IntersectionObserver(
             ([entry]) => {
-                // Show mini player when the main player is NOT visible (intersecting)
                 setIsMiniPlayerVisible(!entry.isIntersecting);
             },
-            { root: null, threshold: 0.1 } // threshold means at least 10% of the element is visible
+            { root: null, threshold: 0.1 }
         );
 
         const currentFooter = footerRef.current;
@@ -67,26 +74,52 @@ const App: React.FC = () => {
         }
     }, [theme]);
     
+    useEffect(() => {
+        const fetchRecommendations = async () => {
+            if (history.length > 0) {
+                setIsRecommendationsLoading(true);
+                setError(null);
+                try {
+                    const results = await getRelatedVideos(history[0].id.videoId);
+                    setRecommendations(results.filter(v => v.id.videoId !== history[0].id.videoId));
+                } catch (err) {
+                    handleApiError(err);
+                    console.error(err);
+                } finally {
+                    setIsRecommendationsLoading(false);
+                }
+            } else {
+                setRecommendations([]);
+                setIsRecommendationsLoading(false);
+            }
+        };
+        fetchRecommendations();
+    }, [history]);
+
     const handleSearch = useCallback(async (query: string) => {
-        if (!query.trim()) return;
-        setIsLoading(true);
+        if (!query.trim()) {
+            setSearchResults(null); // Return to recommendations view
+            return;
+        }
+        setIsSearchLoading(true);
+        setSearchResults([]); // Clear previous results and show loader
         setError(null);
-        setActiveView('tabs'); // Switch back to tabs on new search
+        setActiveView('tabs');
         try {
             const results = await searchVideos(query);
             setSearchResults(results);
         } catch (err) {
-            setError('Failed to fetch videos. Please check your API key and network connection.');
+            handleApiError(err);
             console.error(err);
         } finally {
-            setIsLoading(false);
+            setIsSearchLoading(false);
         }
     }, []);
     
     const addToHistory = useCallback((track: VideoItem) => {
         setHistory(prevHistory => {
             const newHistory = [track, ...prevHistory.filter(item => item.id.videoId !== track.id.videoId)];
-            return newHistory.slice(0, 50); // Keep history limited to 50 items
+            return newHistory.slice(0, 50);
         });
     }, [setHistory]);
 
@@ -111,15 +144,37 @@ const App: React.FC = () => {
         handleSelectTrack(prevTrack);
     }, [playlist, handleSelectTrack]);
     
-    const handlePlayerStateChange = useCallback((event: { data: number }) => {
-        if (event.data === 0 && isAutoplayEnabled) { // ENDED and Autoplay is ON
-            playNext();
-        } else if (event.data === 1) { // PLAYING
-            setIsPlaying(true);
-        } else if (event.data === 2) { // PAUSED
+    const playRelatedVideo = useCallback(async () => {
+        if (!currentTrack) return;
+        try {
+            const relatedVideos = await getRelatedVideos(currentTrack.id.videoId);
+            const nextTrack = relatedVideos.find(video => video.id.videoId !== currentTrack.id.videoId);
+            if (nextTrack) {
+                handleSelectTrack(nextTrack);
+            } else {
+                setIsPlaying(false);
+            }
+        } catch (err) {
+            handleApiError(err);
+            console.error('Failed to autoplay related video:', err);
             setIsPlaying(false);
         }
-    }, [playNext, isAutoplayEnabled]);
+    }, [currentTrack, handleSelectTrack]);
+    
+    const handlePlayerStateChange = useCallback((event: { data: number }) => {
+        if (event.data === 0 && isAutoplayEnabled) {
+            const isTrackInPlaylist = currentTrackIndexInPlaylist.current !== -1;
+            if (isTrackInPlaylist && playlist.length > 0) {
+                playNext();
+            } else {
+                playRelatedVideo();
+            }
+        } else if (event.data === 1) {
+            setIsPlaying(true);
+        } else if (event.data === 2) {
+            setIsPlaying(false);
+        }
+    }, [playNext, isAutoplayEnabled, playlist.length, playRelatedVideo]);
     
     const { volume, setVolume, seekTo, currentTime, duration } = useYouTubePlayer({
         videoId: currentTrack?.id.videoId ?? null,
@@ -130,7 +185,7 @@ const App: React.FC = () => {
     const handleAddToPlaylist = useCallback((track: VideoItem) => {
         setPlaylist(prevPlaylist => {
             if (prevPlaylist.some(item => item.id.videoId === track.id.videoId)) {
-                return prevPlaylist; // Avoid duplicates
+                return prevPlaylist;
             }
             return [...prevPlaylist, track];
         });
@@ -161,7 +216,7 @@ const App: React.FC = () => {
             const results = await getChannelVideos(channelId);
             setChannelVideos(results);
         } catch (err) {
-            setError('Failed to fetch channel videos.');
+            handleApiError(err);
             console.error(err);
         } finally {
             setIsChannelLoading(false);
@@ -177,6 +232,11 @@ const App: React.FC = () => {
     const handleToggleAutoplay = () => {
         setIsAutoplayEnabled(prev => !prev);
     };
+
+    const isShowingSearchResults = searchResults !== null;
+    const listItems = isShowingSearchResults ? searchResults : recommendations;
+    const listIsLoading = isShowingSearchResults ? isSearchLoading : isRecommendationsLoading;
+    const viewType = isShowingSearchResults ? 'search' : 'recommendations';
 
     return (
         <div className="flex flex-col h-screen bg-gray-100 dark:bg-dark-bg text-gray-800 dark:text-dark-text font-sans">
@@ -200,12 +260,13 @@ const App: React.FC = () => {
                     <TabView
                         searchResults={
                             <SearchResultList
-                                results={searchResults}
-                                isLoading={isLoading}
+                                results={listItems}
+                                isLoading={listIsLoading}
                                 onSelectTrack={handleSelectTrack}
                                 onAddToPlaylist={handleAddToPlaylist}
                                 onSelectChannel={handleSelectChannel}
                                 playlist={playlist}
+                                viewType={viewType}
                             />
                         }
                         playlist={

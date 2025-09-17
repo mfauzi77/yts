@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-type Tab = 'Search Results' | 'Playlist' | 'History';
+type Tab = 'Recommendations' | 'Playlist' | 'History';
 
 interface TabViewProps {
   searchResults: React.ReactNode;
@@ -9,11 +9,11 @@ interface TabViewProps {
 }
 
 export const TabView: React.FC<TabViewProps> = ({ searchResults, playlist, history }) => {
-  const [activeTab, setActiveTab] = useState<Tab>('Search Results');
+  const [activeTab, setActiveTab] = useState<Tab>('Recommendations');
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'Search Results':
+      case 'Recommendations':
         return searchResults;
       case 'Playlist':
         return playlist;
@@ -36,7 +36,7 @@ export const TabView: React.FC<TabViewProps> = ({ searchResults, playlist, histo
     <div>
       <div className="border-b border-gray-200 dark:border-gray-700 mb-4">
         <nav className="-mb-px flex space-x-4" aria-label="Tabs">
-            <button onClick={() => setActiveTab('Search Results')} className={getTabClass('Search Results')}>Search Results</button>
+            <button onClick={() => setActiveTab('Recommendations')} className={getTabClass('Recommendations')}>Recommendations</button>
             <button onClick={() => setActiveTab('Playlist')} className={getTabClass('Playlist')}>Playlist</button>
             <button onClick={() => setActiveTab('History')} className={getTabClass('History')}>History</button>
         </nav>

@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { VideoItem } from '../types';
+import { AudioVisualizerCanvas } from './AudioVisualizerCanvas';
 
 interface NowPlayingViewProps {
   isOpen: boolean;
@@ -29,6 +30,7 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
     isOpen, onClose, track, isPlaying, setIsPlaying, onNext, onPrev,
     volume, setVolume, currentTime, duration, seekTo, isAutoplayEnabled, onToggleAutoplay
 }) => {
+    const [showVisualizer, setShowVisualizer] = useState(false);
     
     const handleProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         seekTo(Number(e.target.value));
@@ -69,12 +71,18 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
                     >
                         <i className="fas fa-times text-lg"></i>
                     </button>
-
-                    <img 
-                        src={imageUrl} 
-                        alt={track.snippet.title} 
-                        className="w-48 h-48 md:w-64 md:h-64 rounded-lg shadow-2xl object-cover flex-shrink-0"
-                    />
+                    
+                    <div className="relative w-48 h-48 md:w-64 md:h-64 rounded-lg shadow-2xl flex-shrink-0 overflow-hidden">
+                       {showVisualizer ? (
+                            <AudioVisualizerCanvas isPlaying={isPlaying} />
+                        ) : (
+                            <img 
+                                src={imageUrl} 
+                                alt={track.snippet.title} 
+                                className="w-full h-full object-cover"
+                            />
+                        )}
+                    </div>
                     
                     <div className="flex flex-col flex-grow w-full text-center md:text-left">
                          <h1 className="text-xl md:text-2xl font-bold">{track.snippet.title}</h1>
@@ -96,13 +104,13 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
                         </div>
 
                         <div className="flex justify-center items-center space-x-8 my-4">
-                            <button
-                                onClick={onToggleAutoplay}
-                                aria-label="Toggle Autoplay"
-                                title="Toggle Autoplay"
-                                className={`w-12 h-12 flex items-center justify-center rounded-full hover:bg-white/10 active:bg-white/20 transition-colors ${isAutoplayEnabled ? 'text-brand-red' : 'text-white/80'}`}
+                             <button
+                                onClick={() => setShowVisualizer(prev => !prev)}
+                                aria-label="Toggle Visualizer"
+                                title="Toggle Visualizer"
+                                className={`w-12 h-12 flex items-center justify-center rounded-full hover:bg-white/10 active:bg-white/20 transition-colors ${showVisualizer ? 'text-brand-red' : 'text-white/80'}`}
                             >
-                                <i className="fas fa-repeat text-xl"></i>
+                                <i className="fas fa-chart-bar text-xl"></i>
                             </button>
                             <button 
                                 onClick={onPrev} 
@@ -121,8 +129,14 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
                             >
                                 <i className="fas fa-step-forward text-xl"></i>
                             </button>
-                            {/* Placeholder for spacing */}
-                            <div className="w-12 h-12"></div>
+                            <button
+                                onClick={onToggleAutoplay}
+                                aria-label="Toggle Autoplay"
+                                title="Toggle Autoplay"
+                                className={`w-12 h-12 flex items-center justify-center rounded-full hover:bg-white/10 active:bg-white/20 transition-colors ${isAutoplayEnabled ? 'text-brand-red' : 'text-white/80'}`}
+                            >
+                                <i className="fas fa-repeat text-xl"></i>
+                            </button>
                         </div>
 
                          <div className="flex items-center space-x-3 justify-center md:justify-start mt-4">
