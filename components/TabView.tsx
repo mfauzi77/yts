@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 
-type Tab = 'Recommendations' | 'Playlist' | 'History';
+type Tab = 'Recommendations' | 'Playlist' | 'History' | 'Offline';
 
 interface TabViewProps {
   searchResults: React.ReactNode;
   playlist: React.ReactNode;
   history: React.ReactNode;
+  offline: React.ReactNode;
 }
 
-export const TabView: React.FC<TabViewProps> = ({ searchResults, playlist, history }) => {
+export const TabView: React.FC<TabViewProps> = ({ searchResults, playlist, history, offline }) => {
   const [activeTab, setActiveTab] = useState<Tab>('Recommendations');
 
   const renderContent = () => {
@@ -19,6 +20,8 @@ export const TabView: React.FC<TabViewProps> = ({ searchResults, playlist, histo
         return playlist;
       case 'History':
         return history;
+      case 'Offline':
+        return offline;
       default:
         return null;
     }
@@ -39,6 +42,7 @@ export const TabView: React.FC<TabViewProps> = ({ searchResults, playlist, histo
             <button onClick={() => setActiveTab('Recommendations')} className={getTabClass('Recommendations')}>Recommendations</button>
             <button onClick={() => setActiveTab('Playlist')} className={getTabClass('Playlist')}>Playlist</button>
             <button onClick={() => setActiveTab('History')} className={getTabClass('History')}>History</button>
+            <button onClick={() => setActiveTab('Offline')} className={getTabClass('Offline')}>Offline</button>
         </nav>
       </div>
       <div>

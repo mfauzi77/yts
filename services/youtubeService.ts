@@ -54,9 +54,12 @@ const fetchFromApi = async (params: URLSearchParams): Promise<VideoItem[]> => {
 
 
 export const searchVideos = async (query: string): Promise<VideoItem[]> => {
+  if (!query || !query.trim()) {
+    return [];
+  }
   const params = new URLSearchParams({
     part: 'snippet',
-    q: query,
+    q: query.trim(),
     type: 'video',
     maxResults: '25',
   });
@@ -64,6 +67,10 @@ export const searchVideos = async (query: string): Promise<VideoItem[]> => {
 };
 
 export const getRelatedVideos = async (videoId: string): Promise<VideoItem[]> => {
+    if (!videoId || !videoId.trim()) {
+        console.warn('getRelatedVideos called with an empty or invalid videoId.');
+        return []; // Return an empty array to prevent an API error.
+    }
     const params = new URLSearchParams({
         part: 'snippet',
         relatedToVideoId: videoId,
@@ -74,6 +81,10 @@ export const getRelatedVideos = async (videoId: string): Promise<VideoItem[]> =>
 };
 
 export const getChannelVideos = async (channelId: string): Promise<VideoItem[]> => {
+    if (!channelId || !channelId.trim()) {
+        console.warn('getChannelVideos called with an empty or invalid channelId.');
+        return []; // Return an empty array to prevent an API error.
+    }
     const params = new URLSearchParams({
         part: 'snippet',
         channelId: channelId,

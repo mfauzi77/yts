@@ -13,6 +13,7 @@ import { useYouTubePlayer } from './hooks/useYouTubePlayer';
 import { NowPlayingView } from './components/NowPlayingView';
 import { ChannelView } from './components/ChannelView';
 import { FloatingPlayer } from './components/FloatingPlayer';
+import { OfflineList } from './components/OfflineList';
 
 type ActiveView = 'tabs' | 'channel';
 
@@ -35,10 +36,12 @@ const App: React.FC = () => {
 
     const [playlist, setPlaylist] = useLocalStorage<VideoItem[]>('ytas-playlist', []);
     const [history, setHistory] = useLocalStorage<VideoItem[]>('ytas-history', []);
+    const [offlineItems, setOfflineItems] = useLocalStorage<VideoItem[]>('ytas-offline', []);
     const [theme, setTheme] = useLocalStorage<'light' | 'dark'>('ytas-theme', 'dark');
     const [isAutoplayEnabled, setIsAutoplayEnabled] = useLocalStorage<boolean>('ytas-autoplay', true);
 
-    const currentTrackIndexInPlaylist = useRef(-1);
+    const [activePlaybackList, setActivePlaybackList] = useState<VideoItem[]>([]);
+    const currentTrackIndexRef = useRef(-1);
     const footerRef = useRef<HTMLElement>(null);
 
     const handleApiError = (err: unknown) => {
@@ -95,6 +98,54 @@ const App: React.FC = () => {
         };
         fetchRecommendations();
     }, [history]);
+    
+    const handleGenerateDiscoveryMix = useCallback(async () => {
+        setIsRecommendationsLoading(true);
+        setError(null);
+        setSearchResults(null); // Ensure we're in recommendations view
+    
+        try {
+            // 1. Select seed tracks (mix of history and playlist)
+            const historySeeds = history.slice(0, 3);
+            const playlistSeeds = [...playlist].sort(() => 0.5 - Math.random()).slice(0, 2);
+            const seedTracks = [...historySeeds, ...playlistSeeds].filter(
+                (track, index, self) => index === self.findIndex(t => t.id.videoId === track.id.videoId)
+            );
+    
+            if (seedTracks.length === 0) {
+                if (history.length > 0) {
+                     const results = await getRelatedVideos(history[0].id.videoId);
+                     setRecommendations(results);
+                } else {
+                    setRecommendations([]);
+                }
+                return;
+            }
+    
+            // 2. Fetch related videos for each seed
+            const promises = seedTracks.map(track => getRelatedVideos(track.id.videoId));
+            const resultsArrays = await Promise.all(promises);
+    
+            // 3. Combine, deduplicate, and shuffle
+            const allRelatedVideos = resultsArrays.flat();
+            const uniqueVideosMap = new Map<string, VideoItem>();
+            allRelatedVideos.forEach(video => {
+                const isSeed = seedTracks.some(seed => seed.id.videoId === video.id.videoId);
+                if (!isSeed) {
+                    uniqueVideosMap.set(video.id.videoId, video);
+                }
+            });
+            
+            const shuffledMix = [...uniqueVideosMap.values()].sort(() => 0.5 - Math.random());
+            setRecommendations(shuffledMix);
+    
+        } catch (err) {
+            handleApiError(err);
+            console.error('Failed to generate Discovery Mix:', err);
+        } finally {
+            setIsRecommendationsLoading(false);
+        }
+    }, [history, playlist]);
 
     const handleSearch = useCallback(async (query: string) => {
         if (!query.trim()) {
@@ -123,26 +174,27 @@ const App: React.FC = () => {
         });
     }, [setHistory]);
 
-    const handleSelectTrack = useCallback((track: VideoItem) => {
+    const handleSelectTrack = useCallback((track: VideoItem, contextList: VideoItem[] = []) => {
         setCurrentTrack(track);
         setIsPlaying(true);
         addToHistory(track);
-        currentTrackIndexInPlaylist.current = playlist.findIndex(item => item.id.videoId === track.id.videoId);
-    }, [addToHistory, playlist]);
+        setActivePlaybackList(contextList);
+        currentTrackIndexRef.current = contextList.findIndex(item => item.id.videoId === track.id.videoId);
+    }, [addToHistory]);
     
     const playNext = useCallback(() => {
-        if (playlist.length === 0) return;
-        currentTrackIndexInPlaylist.current = (currentTrackIndexInPlaylist.current + 1) % playlist.length;
-        const nextTrack = playlist[currentTrackIndexInPlaylist.current];
-        handleSelectTrack(nextTrack);
-    }, [playlist, handleSelectTrack]);
+        if (activePlaybackList.length === 0) return;
+        currentTrackIndexRef.current = (currentTrackIndexRef.current + 1) % activePlaybackList.length;
+        const nextTrack = activePlaybackList[currentTrackIndexRef.current];
+        handleSelectTrack(nextTrack, activePlaybackList);
+    }, [activePlaybackList, handleSelectTrack]);
 
     const playPrev = useCallback(() => {
-        if (playlist.length === 0) return;
-        currentTrackIndexInPlaylist.current = (currentTrackIndexInPlaylist.current - 1 + playlist.length) % playlist.length;
-        const prevTrack = playlist[currentTrackIndexInPlaylist.current];
-        handleSelectTrack(prevTrack);
-    }, [playlist, handleSelectTrack]);
+        if (activePlaybackList.length === 0) return;
+        currentTrackIndexRef.current = (currentTrackIndexRef.current - 1 + activePlaybackList.length) % activePlaybackList.length;
+        const prevTrack = activePlaybackList[currentTrackIndexRef.current];
+        handleSelectTrack(prevTrack, activePlaybackList);
+    }, [activePlaybackList, handleSelectTrack]);
     
     const playRelatedVideo = useCallback(async () => {
         if (!currentTrack) return;
@@ -150,7 +202,7 @@ const App: React.FC = () => {
             const relatedVideos = await getRelatedVideos(currentTrack.id.videoId);
             const nextTrack = relatedVideos.find(video => video.id.videoId !== currentTrack.id.videoId);
             if (nextTrack) {
-                handleSelectTrack(nextTrack);
+                handleSelectTrack(nextTrack, []); // No context list for related videos
             } else {
                 setIsPlaying(false);
             }
@@ -162,19 +214,19 @@ const App: React.FC = () => {
     }, [currentTrack, handleSelectTrack]);
     
     const handlePlayerStateChange = useCallback((event: { data: number }) => {
-        if (event.data === 0 && isAutoplayEnabled) {
-            const isTrackInPlaylist = currentTrackIndexInPlaylist.current !== -1;
-            if (isTrackInPlaylist && playlist.length > 0) {
+        if (event.data === 0 && isAutoplayEnabled) { // Video ended
+            const isTrackInActiveList = currentTrackIndexRef.current !== -1 && activePlaybackList.length > 0;
+            if (isTrackInActiveList) {
                 playNext();
             } else {
                 playRelatedVideo();
             }
-        } else if (event.data === 1) {
+        } else if (event.data === 1) { // Playing
             setIsPlaying(true);
-        } else if (event.data === 2) {
+        } else if (event.data === 2) { // Paused
             setIsPlaying(false);
         }
-    }, [playNext, isAutoplayEnabled, playlist.length, playRelatedVideo]);
+    }, [playNext, isAutoplayEnabled, activePlaybackList.length, playRelatedVideo]);
     
     const { volume, setVolume, seekTo, currentTime, duration } = useYouTubePlayer({
         videoId: currentTrack?.id.videoId ?? null,
@@ -194,6 +246,25 @@ const App: React.FC = () => {
     const handleRemoveFromPlaylist = useCallback((trackId: string) => {
         setPlaylist(prevPlaylist => prevPlaylist.filter(item => item.id.videoId !== trackId));
     }, [setPlaylist]);
+
+    const handleAddToOffline = useCallback((track: VideoItem) => {
+        setOfflineItems(prev => {
+            if (prev.some(item => item.id.videoId === track.id.videoId)) {
+                return prev;
+            }
+            // Pre-fetch high-res thumbnail to ensure it gets cached by the service worker
+            const highResThumb = track.snippet.thumbnails.high?.url;
+            if (highResThumb) {
+                fetch(highResThumb).catch(err => console.warn('Could not pre-cache thumbnail:', err));
+            }
+            return [track, ...prev];
+        });
+    }, [setOfflineItems]);
+
+    const handleRemoveFromOffline = useCallback((trackId: string) => {
+        setOfflineItems(prev => prev.filter(item => item.id.videoId !== trackId));
+    }, [setOfflineItems]);
+
 
     const toggleTheme = () => {
         setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
@@ -267,6 +338,9 @@ const App: React.FC = () => {
                                 onSelectChannel={handleSelectChannel}
                                 playlist={playlist}
                                 viewType={viewType}
+                                onGenerateDiscoveryMix={handleGenerateDiscoveryMix}
+                                offlineItems={offlineItems}
+                                onAddToOffline={handleAddToOffline}
                             />
                         }
                         playlist={
@@ -278,6 +352,8 @@ const App: React.FC = () => {
                                 currentTrackId={currentTrack?.id.videoId}
                                 isAutoplayEnabled={isAutoplayEnabled}
                                 onToggleAutoplay={handleToggleAutoplay}
+                                offlineItems={offlineItems}
+                                onAddToOffline={handleAddToOffline}
                             />
                         }
                         history={
@@ -286,6 +362,17 @@ const App: React.FC = () => {
                                 onSelectTrack={handleSelectTrack}
                                 onAddToPlaylist={handleAddToPlaylist}
                                 onSelectChannel={handleSelectChannel}
+                                offlineItems={offlineItems}
+                                onAddToOffline={handleAddToOffline}
+                            />
+                        }
+                        offline={
+                            <OfflineList
+                                offlinePlaylist={offlineItems}
+                                onSelectTrack={handleSelectTrack}
+                                onRemoveFromOfflinePlaylist={handleRemoveFromOffline}
+                                onSelectChannel={handleSelectChannel}
+                                currentTrackId={currentTrack?.id.videoId}
                             />
                         }
                     />
@@ -300,6 +387,8 @@ const App: React.FC = () => {
                         onAddToPlaylist={handleAddToPlaylist}
                         onBack={handleBackToTabs}
                         playlist={playlist}
+                        offlineItems={offlineItems}
+                        onAddToOffline={handleAddToOffline}
                     />
                 )}
 
