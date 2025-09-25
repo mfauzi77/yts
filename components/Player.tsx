@@ -13,123 +13,136 @@ interface PlayerProps {
   setVolume: (volume: number) => void;
   currentTime: number;
   duration: number;
+  seekTo: (seconds: number) => void;
+  onToggleMiniPlayer: () => void;
 }
 
-const AudioVisualizer: React.FC<{ isPlaying: boolean }> = ({ isPlaying }) => {
-    const barClasses = "w-1 rounded-full bg-brand-red/70";
-    const animationClass = isPlaying ? 'animate-pulse' : '';
-    return (
-        <div className="flex items-center justify-center space-x-1 h-6">
-            <div className={`${barClasses} h-2 ${animationClass}`} style={{ animationDelay: '0s' }}></div>
-            <div className={`${barClasses} h-4 ${animationClass}`} style={{ animationDelay: '0.2s' }}></div>
-            <div className={`${barClasses} h-6 ${animationClass}`} style={{ animationDelay: '0.4s' }}></div>
-            <div className={`${barClasses} h-4 ${animationClass}`} style={{ animationDelay: '0.6s' }}></div>
-            <div className={`${barClasses} h-2 ${animationClass}`} style={{ animationDelay: '0.8s' }}></div>
-        </div>
-    );
+const formatTime = (seconds: number) => {
+    if (isNaN(seconds) || seconds < 0) return '0:00';
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 };
 
+
 export const Player: React.FC<PlayerProps> = ({
-    track,
-    isPlaying,
-    setIsPlaying,
-    onNext,
-    onPrev,
-    onToggleNowPlaying,
-    onSelectChannel,
-    volume,
-    setVolume,
-    currentTime,
-    duration,
+    track, isPlaying, setIsPlaying, onNext, onPrev, onToggleNowPlaying,
+    onSelectChannel, volume, setVolume, currentTime, duration, seekTo, onToggleMiniPlayer,
 }) => {
-    
-    const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setVolume(Number(e.target.value));
-    }
-    
-    const handleTogglePlay = () => {
-        setIsPlaying(!isPlaying);
-    };
     
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-                return;
-            }
-            if (e.code === 'Space') {
-                e.preventDefault();
-                handleTogglePlay();
-            }
-            if (e.code === 'ArrowRight') {
-                e.preventDefault();
-                onNext();
-            }
-            if (e.code === 'ArrowLeft') {
-                e.preventDefault();
-                onPrev();
-            }
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+            if (e.code === 'Space') { e.preventDefault(); setIsPlaying(!isPlaying); }
+            if (e.code === 'ArrowRight') { e.preventDefault(); onNext(); }
+            if (e.code === 'ArrowLeft') { e.preventDefault(); onPrev(); }
         };
-
         window.addEventListener('keydown', handleKeyDown);
-        return () => {
-            window.removeEventListener('keydown', handleKeyDown);
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [onNext, onPrev, isPlaying]);
-    
-    const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onNext, onPrev, isPlaying, setIsPlaying]);
 
     const handleChannelClick = (e: React.MouseEvent) => {
-        e.stopPropagation(); // Prevent onToggleNowPlaying from firing
+        e.stopPropagation();
+        onToggleNowPlaying(); // Close now playing view first if open
         onSelectChannel(track.snippet.channelId, track.snippet.channelTitle);
     };
 
+    const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
+
     return (
-        <div className="relative bg-white/80 dark:bg-dark-surface/80 backdrop-blur-md shadow-lg p-2 border-t border-gray-200 dark:border-gray-700">
-            <div className="absolute top-0 left-0 h-0.5 bg-brand-red" style={{ width: `${progress}%` }}></div>
-            <div className="container mx-auto px-4 flex items-center justify-between">
-                <div 
-                    className="flex items-center space-x-4 w-1/4 cursor-pointer"
-                    onClick={onToggleNowPlaying}
-                    title="Open player view"
-                >
-                    <img src={track.snippet.thumbnails.default.url} alt={track.snippet.title} className="w-14 h-14 rounded-md object-cover" />
+        <div className="relative bg-dark-surface border-t border-dark-card/50">
+             {/* Mobile-only Progress Bar */}
+            <div className="absolute top-0 left-0 right-0 h-0.5 bg-dark-card md:hidden">
+                <div className="bg-brand-red h-full" style={{ width: `${progressPercentage}%` }}></div>
+            </div>
+            
+            {/* Mobile View */}
+            <div className="md:hidden p-2 flex items-center justify-between">
+                <div className="flex items-center space-x-3 min-w-0 flex-1">
+                    <img 
+                        src={track.snippet.thumbnails.default.url} 
+                        alt={track.snippet.title} 
+                        className="w-12 h-12 rounded-md object-cover cursor-pointer flex-shrink-0"
+                        onClick={onToggleNowPlaying}
+                    />
+                    <div className="min-w-0">
+                        <p className="font-semibold text-sm truncate cursor-pointer text-white" onClick={onToggleNowPlaying}>{track.snippet.title}</p>
+                        <p className="text-xs text-dark-subtext truncate cursor-pointer hover:underline" onClick={handleChannelClick}>
+                            {track.snippet.channelTitle}
+                        </p>
+                    </div>
+                </div>
+                <div className="flex items-center space-x-2 flex-shrink-0 pl-2">
+                    <button onClick={() => setIsPlaying(!isPlaying)} className="w-10 h-10 flex items-center justify-center text-white">
+                        <i className={`fas ${isPlaying ? 'fa-pause' : 'fa-play'} text-2xl`}></i>
+                    </button>
+                </div>
+            </div>
+
+            {/* Desktop View */}
+            <div className="hidden md:grid grid-cols-3 items-center text-white p-3">
+                {/* Left: Track Info */}
+                <div className="flex items-center space-x-4">
+                    <img 
+                        src={track.snippet.thumbnails.default.url} 
+                        alt={track.snippet.title} 
+                        className="w-14 h-14 rounded-md object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={onToggleNowPlaying}
+                    />
                     <div>
-                        <p className="font-bold text-sm truncate text-gray-900 dark:text-white">{track.snippet.title}</p>
-                        <p 
-                            className="text-xs text-gray-500 dark:text-dark-subtext hover:underline"
-                            onClick={handleChannelClick}
-                        >
+                        <p className="font-semibold text-sm truncate cursor-pointer hover:underline" onClick={onToggleNowPlaying}>{track.snippet.title}</p>
+                        <p className="text-xs text-dark-subtext cursor-pointer hover:underline" onClick={handleChannelClick}>
                             {track.snippet.channelTitle}
                         </p>
                     </div>
                 </div>
 
-                <div className="flex flex-col items-center justify-center w-1/2">
+                {/* Center: Playback Controls */}
+                <div className="flex flex-col items-center justify-center">
                     <div className="flex items-center space-x-6">
-                        <button onClick={onPrev} className="text-gray-600 dark:text-dark-subtext hover:text-black dark:hover:text-white transition-colors">
+                        <button onClick={onPrev} className="text-dark-subtext hover:text-white transition-colors">
                             <i className="fas fa-step-backward fa-lg"></i>
                         </button>
-                        <button onClick={handleTogglePlay} className="w-12 h-12 flex items-center justify-center bg-brand-red text-white rounded-full shadow-md hover:bg-red-700 transition-transform transform hover:scale-105">
+                        <button onClick={() => setIsPlaying(!isPlaying)} className="w-10 h-10 flex items-center justify-center bg-white text-black rounded-full shadow-md hover:scale-105 transition-transform">
                             <i className={`fas ${isPlaying ? 'fa-pause' : 'fa-play'} fa-lg`}></i>
                         </button>
-                        <button onClick={onNext} className="text-gray-600 dark:text-dark-subtext hover:text-black dark:hover:text-white transition-colors">
+                        <button onClick={onNext} className="text-dark-subtext hover:text-white transition-colors">
                             <i className="fas fa-step-forward fa-lg"></i>
                         </button>
                     </div>
+                    <div className="flex items-center space-x-2 w-full max-w-md mt-2">
+                        <span className="text-xs text-dark-subtext font-mono">{formatTime(currentTime)}</span>
+                        <input
+                            type="range"
+                            min="0"
+                            max={duration || 0}
+                            value={currentTime}
+                            onChange={(e) => seekTo(Number(e.target.value))}
+                            className="w-full h-1 bg-dark-card rounded-lg appearance-none cursor-pointer accent-brand-red"
+                        />
+                        <span className="text-xs text-dark-subtext font-mono">{formatTime(duration)}</span>
+                    </div>
                 </div>
 
-                <div className="flex items-center space-x-4 w-1/4 justify-end">
-                    <AudioVisualizer isPlaying={isPlaying} />
+                {/* Right: Volume & Options */}
+                <div className="flex items-center space-x-4 justify-end">
+                    <button 
+                        onClick={onToggleMiniPlayer} 
+                        title="Mini player" 
+                        className="p-2 rounded-full text-dark-subtext hover:bg-dark-card hover:text-white transition-colors"
+                        aria-label="Toggle mini player"
+                    >
+                        <i className="far fa-window-minimize"></i>
+                    </button>
                     <div className="flex items-center space-x-2 w-32">
-                        <i className={`fas ${volume === 0 ? 'fa-volume-mute' : 'fa-volume-down'} text-gray-600 dark:text-dark-subtext`}></i>
+                        <i className={`fas ${volume === 0 ? 'fa-volume-mute' : 'fa-volume-down'} text-dark-subtext`}></i>
                         <input
                             type="range"
                             min="0"
                             max="100"
                             value={volume}
-                            onChange={handleVolumeChange}
-                            className="w-full h-1 bg-gray-300 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-brand-red"
+                            onChange={(e) => setVolume(Number(e.target.value))}
+                            className="w-full h-1 bg-dark-card rounded-lg appearance-none cursor-pointer accent-brand-red"
                         />
                     </div>
                 </div>

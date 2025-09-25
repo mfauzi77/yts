@@ -1,7 +1,6 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { SearchBar } from './components/SearchBar';
 import { Player } from './components/Player';
-import { TabView } from './components/TabView';
 import { SearchResultList } from './components/SearchResultsList';
 import { Playlist } from './components/Playlist';
 import { HistoryList } from './components/HistoryList';
@@ -14,8 +13,13 @@ import { NowPlayingView } from './components/NowPlayingView';
 import { ChannelView } from './components/ChannelView';
 import { FloatingPlayer } from './components/FloatingPlayer';
 import { OfflineList } from './components/OfflineList';
+import { ApiStatusIndicator } from './components/ApiStatusIndicator';
+import { LandingPage } from './components/LandingPage';
+import { Sidebar } from './components/Sidebar';
+import { BottomNavBar } from './components/BottomNavBar';
 
-type ActiveView = 'tabs' | 'channel';
+type MainView = 'home' | 'playlist' | 'history' | 'offline' | 'channel';
+type ApiStatus = 'idle' | 'success' | 'error';
 
 const App: React.FC = () => {
     const [searchResults, setSearchResults] = useState<VideoItem[] | null>(null);
@@ -28,11 +32,14 @@ const App: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [isNowPlayingViewOpen, setIsNowPlayingViewOpen] = useState(false);
     
-    const [activeView, setActiveView] = useState<ActiveView>('tabs');
+    const [activeView, setActiveView] = useState<MainView>('home');
     const [selectedChannel, setSelectedChannel] = useState<{ id: string; title: string } | null>(null);
     const [channelVideos, setChannelVideos] = useState<VideoItem[]>([]);
     const [isChannelLoading, setIsChannelLoading] = useState<boolean>(false);
-    const [isMiniPlayerVisible, setIsMiniPlayerVisible] = useState(false);
+    const [isMiniPlayerActive, setIsMiniPlayerActive] = useState(false);
+    const [apiStatus, setApiStatus] = useState<ApiStatus>('idle');
+    const [isAppEntered, setIsAppEntered] = useState<boolean>(false);
+    const [isLandingPageMounted, setIsLandingPageMounted] = useState<boolean>(true);
 
     const [playlist, setPlaylist] = useLocalStorage<VideoItem[]>('ytas-playlist', []);
     const [history, setHistory] = useLocalStorage<VideoItem[]>('ytas-history', []);
@@ -41,43 +48,30 @@ const App: React.FC = () => {
     const [isAutoplayEnabled, setIsAutoplayEnabled] = useLocalStorage<boolean>('ytas-autoplay', true);
 
     const [activePlaybackList, setActivePlaybackList] = useState<VideoItem[]>([]);
-    const currentTrackIndexRef = useRef(-1);
-    const footerRef = useRef<HTMLElement>(null);
+    const currentTrackIndexRef = React.useRef(-1);
 
     const handleApiError = (err: unknown) => {
         const message = err instanceof Error ? err.message : 'An unknown error occurred.';
+        console.error("API Error:", message);
         setError(message);
+        setApiStatus('error');
     };
 
     useEffect(() => {
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                setIsMiniPlayerVisible(!entry.isIntersecting);
-            },
-            { root: null, threshold: 0.1 }
-        );
-
-        const currentFooter = footerRef.current;
-        if (currentFooter) {
-            observer.observe(currentFooter);
+        if (apiStatus === 'success' || apiStatus === 'error') {
+            const timer = setTimeout(() => setApiStatus('idle'), 3000);
+            return () => clearTimeout(timer);
         }
+    }, [apiStatus]);
 
-        return () => {
-            if (currentFooter) {
-                observer.unobserve(currentFooter);
-            }
-        };
-    }, []);
 
     useEffect(() => {
-        if (theme === 'dark') {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
+        document.documentElement.classList.toggle('dark', theme === 'dark');
     }, [theme]);
     
     useEffect(() => {
+        if (!isAppEntered) return;
+
         const fetchRecommendations = async () => {
             if (history.length > 0) {
                 setIsRecommendationsLoading(true);
@@ -85,63 +79,47 @@ const App: React.FC = () => {
                 try {
                     const results = await getRelatedVideos(history[0].id.videoId);
                     setRecommendations(results.filter(v => v.id.videoId !== history[0].id.videoId));
-                } catch (err) {
-                    handleApiError(err);
-                    console.error(err);
-                } finally {
-                    setIsRecommendationsLoading(false);
-                }
+                    setApiStatus('success');
+                } catch (err) { handleApiError(err); } 
+                finally { setIsRecommendationsLoading(false); }
             } else {
                 setRecommendations([]);
                 setIsRecommendationsLoading(false);
             }
         };
         fetchRecommendations();
-    }, [history]);
+    }, [history, isAppEntered]);
     
     const handleGenerateDiscoveryMix = useCallback(async () => {
         setIsRecommendationsLoading(true);
         setError(null);
-        setSearchResults(null); // Ensure we're in recommendations view
+        setSearchResults(null);
+        setActiveView('home');
     
         try {
-            // 1. Select seed tracks (mix of history and playlist)
             const historySeeds = history.slice(0, 3);
             const playlistSeeds = [...playlist].sort(() => 0.5 - Math.random()).slice(0, 2);
-            const seedTracks = [...historySeeds, ...playlistSeeds].filter(
-                (track, index, self) => index === self.findIndex(t => t.id.videoId === track.id.videoId)
-            );
+            const seedTracks = [...new Map([...historySeeds, ...playlistSeeds].map(item => [item.id.videoId, item])).values()];
     
             if (seedTracks.length === 0) {
-                if (history.length > 0) {
-                     const results = await getRelatedVideos(history[0].id.videoId);
-                     setRecommendations(results);
-                } else {
-                    setRecommendations([]);
-                }
+                setRecommendations([]);
                 return;
             }
     
-            // 2. Fetch related videos for each seed
-            const promises = seedTracks.map(track => getRelatedVideos(track.id.videoId));
-            const resultsArrays = await Promise.all(promises);
-    
-            // 3. Combine, deduplicate, and shuffle
+            const resultsArrays = await Promise.all(seedTracks.map(track => getRelatedVideos(track.id.videoId)));
             const allRelatedVideos = resultsArrays.flat();
             const uniqueVideosMap = new Map<string, VideoItem>();
             allRelatedVideos.forEach(video => {
-                const isSeed = seedTracks.some(seed => seed.id.videoId === video.id.videoId);
-                if (!isSeed) {
+                if (!seedTracks.some(seed => seed.id.videoId === video.id.videoId)) {
                     uniqueVideosMap.set(video.id.videoId, video);
                 }
             });
             
-            const shuffledMix = [...uniqueVideosMap.values()].sort(() => 0.5 - Math.random());
-            setRecommendations(shuffledMix);
+            setRecommendations([...uniqueVideosMap.values()].sort(() => 0.5 - Math.random()));
+            setApiStatus('success');
     
         } catch (err) {
             handleApiError(err);
-            console.error('Failed to generate Discovery Mix:', err);
         } finally {
             setIsRecommendationsLoading(false);
         }
@@ -149,19 +127,19 @@ const App: React.FC = () => {
 
     const handleSearch = useCallback(async (query: string) => {
         if (!query.trim()) {
-            setSearchResults(null); // Return to recommendations view
+            setSearchResults(null);
             return;
         }
         setIsSearchLoading(true);
-        setSearchResults([]); // Clear previous results and show loader
+        setSearchResults([]);
         setError(null);
-        setActiveView('tabs');
+        setActiveView('home');
         try {
             const results = await searchVideos(query);
             setSearchResults(results);
+            setApiStatus('success');
         } catch (err) {
             handleApiError(err);
-            console.error(err);
         } finally {
             setIsSearchLoading(false);
         }
@@ -180,20 +158,23 @@ const App: React.FC = () => {
         addToHistory(track);
         setActivePlaybackList(contextList);
         currentTrackIndexRef.current = contextList.findIndex(item => item.id.videoId === track.id.videoId);
+        
+        // Automatically open Now Playing view on mobile
+        if (window.innerWidth < 768) { // Corresponds to Tailwind's `md` breakpoint
+            setIsNowPlayingViewOpen(true);
+        }
     }, [addToHistory]);
     
     const playNext = useCallback(() => {
         if (activePlaybackList.length === 0) return;
         currentTrackIndexRef.current = (currentTrackIndexRef.current + 1) % activePlaybackList.length;
-        const nextTrack = activePlaybackList[currentTrackIndexRef.current];
-        handleSelectTrack(nextTrack, activePlaybackList);
+        handleSelectTrack(activePlaybackList[currentTrackIndexRef.current], activePlaybackList);
     }, [activePlaybackList, handleSelectTrack]);
 
     const playPrev = useCallback(() => {
         if (activePlaybackList.length === 0) return;
         currentTrackIndexRef.current = (currentTrackIndexRef.current - 1 + activePlaybackList.length) % activePlaybackList.length;
-        const prevTrack = activePlaybackList[currentTrackIndexRef.current];
-        handleSelectTrack(prevTrack, activePlaybackList);
+        handleSelectTrack(activePlaybackList[currentTrackIndexRef.current], activePlaybackList);
     }, [activePlaybackList, handleSelectTrack]);
     
     const playRelatedVideo = useCallback(async () => {
@@ -202,30 +183,26 @@ const App: React.FC = () => {
             const relatedVideos = await getRelatedVideos(currentTrack.id.videoId);
             const nextTrack = relatedVideos.find(video => video.id.videoId !== currentTrack.id.videoId);
             if (nextTrack) {
-                handleSelectTrack(nextTrack, []); // No context list for related videos
+                handleSelectTrack(nextTrack, []);
             } else {
                 setIsPlaying(false);
             }
+            setApiStatus('success');
         } catch (err) {
             handleApiError(err);
-            console.error('Failed to autoplay related video:', err);
             setIsPlaying(false);
         }
     }, [currentTrack, handleSelectTrack]);
     
     const handlePlayerStateChange = useCallback((event: { data: number }) => {
-        if (event.data === 0 && isAutoplayEnabled) { // Video ended
-            const isTrackInActiveList = currentTrackIndexRef.current !== -1 && activePlaybackList.length > 0;
-            if (isTrackInActiveList) {
+        if (event.data === 0 && isAutoplayEnabled) {
+            if (currentTrackIndexRef.current !== -1 && activePlaybackList.length > 0) {
                 playNext();
             } else {
                 playRelatedVideo();
             }
-        } else if (event.data === 1) { // Playing
-            setIsPlaying(true);
-        } else if (event.data === 2) { // Paused
-            setIsPlaying(false);
-        }
+        } else if (event.data === 1) setIsPlaying(true);
+        else if (event.data === 2) setIsPlaying(false);
     }, [playNext, isAutoplayEnabled, activePlaybackList.length, playRelatedVideo]);
     
     const { volume, setVolume, seekTo, currentTime, duration } = useYouTubePlayer({
@@ -235,28 +212,17 @@ const App: React.FC = () => {
     });
 
     const handleAddToPlaylist = useCallback((track: VideoItem) => {
-        setPlaylist(prevPlaylist => {
-            if (prevPlaylist.some(item => item.id.videoId === track.id.videoId)) {
-                return prevPlaylist;
-            }
-            return [...prevPlaylist, track];
-        });
+        setPlaylist(prev => prev.some(item => item.id.videoId === track.id.videoId) ? prev : [...prev, track]);
     }, [setPlaylist]);
 
     const handleRemoveFromPlaylist = useCallback((trackId: string) => {
-        setPlaylist(prevPlaylist => prevPlaylist.filter(item => item.id.videoId !== trackId));
+        setPlaylist(prev => prev.filter(item => item.id.videoId !== trackId));
     }, [setPlaylist]);
 
     const handleAddToOffline = useCallback((track: VideoItem) => {
         setOfflineItems(prev => {
-            if (prev.some(item => item.id.videoId === track.id.videoId)) {
-                return prev;
-            }
-            // Pre-fetch high-res thumbnail to ensure it gets cached by the service worker
-            const highResThumb = track.snippet.thumbnails.high?.url;
-            if (highResThumb) {
-                fetch(highResThumb).catch(err => console.warn('Could not pre-cache thumbnail:', err));
-            }
+            if (prev.some(item => item.id.videoId === track.id.videoId)) return prev;
+            fetch(track.snippet.thumbnails.high?.url).catch(err => console.warn('Could not pre-cache thumbnail:', err));
             return [track, ...prev];
         });
     }, [setOfflineItems]);
@@ -264,19 +230,6 @@ const App: React.FC = () => {
     const handleRemoveFromOffline = useCallback((trackId: string) => {
         setOfflineItems(prev => prev.filter(item => item.id.videoId !== trackId));
     }, [setOfflineItems]);
-
-
-    const toggleTheme = () => {
-        setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
-    };
-
-    const openNowPlayingView = useCallback(() => {
-        setIsNowPlayingViewOpen(true);
-    }, []);
-
-    const closeNowPlayingView = useCallback(() => {
-        setIsNowPlayingViewOpen(false);
-    }, []);
 
     const handleSelectChannel = useCallback(async (channelId: string, channelTitle: string) => {
         setIsChannelLoading(true);
@@ -286,134 +239,164 @@ const App: React.FC = () => {
         try {
             const results = await getChannelVideos(channelId);
             setChannelVideos(results);
-        } catch (err) {
-            handleApiError(err);
-            console.error(err);
-        } finally {
-            setIsChannelLoading(false);
-        }
+            setApiStatus('success');
+        } catch (err) { handleApiError(err); } 
+        finally { setIsChannelLoading(false); }
     }, []);
     
-    const handleBackToTabs = () => {
-        setActiveView('tabs');
+    const handleBackToTabs = (originView: MainView = 'home') => {
+        setActiveView(originView);
         setSelectedChannel(null);
         setChannelVideos([]);
     };
     
-    const handleToggleAutoplay = () => {
-        setIsAutoplayEnabled(prev => !prev);
+    const handleEnterApp = () => {
+        setIsAppEntered(true);
+        setTimeout(() => setIsLandingPageMounted(false), 500);
     };
 
-    const isShowingSearchResults = searchResults !== null;
-    const listItems = isShowingSearchResults ? searchResults : recommendations;
-    const listIsLoading = isShowingSearchResults ? isSearchLoading : isRecommendationsLoading;
-    const viewType = isShowingSearchResults ? 'search' : 'recommendations';
+    const renderMainView = () => {
+        switch(activeView) {
+            case 'home':
+                const isShowingSearchResults = searchResults !== null;
+                return <SearchResultList
+                    results={isShowingSearchResults ? searchResults : recommendations}
+                    isLoading={isShowingSearchResults ? isSearchLoading : isRecommendationsLoading}
+                    onSelectTrack={handleSelectTrack}
+                    onAddToPlaylist={handleAddToPlaylist}
+                    onSelectChannel={handleSelectChannel}
+                    playlist={playlist}
+                    viewType={isShowingSearchResults ? 'search' : 'recommendations'}
+                    onGenerateDiscoveryMix={handleGenerateDiscoveryMix}
+                    offlineItems={offlineItems}
+                    onAddToOffline={handleAddToOffline}
+                    currentTrackId={currentTrack?.id.videoId}
+                />;
+            case 'playlist':
+                return <Playlist
+                    playlist={playlist}
+                    onSelectTrack={handleSelectTrack}
+                    onRemoveFromPlaylist={handleRemoveFromPlaylist}
+                    onSelectChannel={handleSelectChannel}
+                    currentTrackId={currentTrack?.id.videoId}
+                    isAutoplayEnabled={isAutoplayEnabled}
+                    onToggleAutoplay={() => setIsAutoplayEnabled(p => !p)}
+                    offlineItems={offlineItems}
+                    onAddToOffline={handleAddToOffline}
+                />;
+            case 'history':
+                return <HistoryList
+                    history={history}
+                    onSelectTrack={handleSelectTrack}
+                    onAddToPlaylist={handleAddToPlaylist}
+                    onSelectChannel={handleSelectChannel}
+                    offlineItems={offlineItems}
+                    onAddToOffline={handleAddToOffline}
+                    currentTrackId={currentTrack?.id.videoId}
+                />;
+            case 'offline':
+                 return <OfflineList
+                    offlinePlaylist={offlineItems}
+                    onSelectTrack={handleSelectTrack}
+                    onRemoveFromOfflinePlaylist={handleRemoveFromOffline}
+                    onSelectChannel={handleSelectChannel}
+                    currentTrackId={currentTrack?.id.videoId}
+                />;
+            case 'channel':
+                if (!selectedChannel) return null;
+                return <ChannelView
+                    channelTitle={selectedChannel.title}
+                    videos={channelVideos}
+                    isLoading={isChannelLoading}
+                    onSelectTrack={handleSelectTrack}
+                    onAddToPlaylist={handleAddToPlaylist}
+                    onBack={() => handleBackToTabs()}
+                    playlist={playlist}
+                    offlineItems={offlineItems}
+                    onAddToOffline={handleAddToOffline}
+                    currentTrackId={currentTrack?.id.videoId}
+                />;
+            default: return null;
+        }
+    }
+
+    const viewTitles: { [key in MainView]?: string } = {
+        home: 'Home',
+        playlist: 'Playlist',
+        history: 'History',
+        offline: 'Offline Library',
+    };
 
     return (
-        <div className="flex flex-col h-screen bg-gray-100 dark:bg-dark-bg text-gray-800 dark:text-dark-text font-sans">
-            <header className="flex-shrink-0 bg-white dark:bg-dark-surface shadow-md z-20">
-                <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                       <i className="fab fa-youtube text-brand-red text-3xl"></i>
-                        <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">Audio Streamer</h1>
-                    </div>
-                    <div className="w-full max-w-lg">
-                        <SearchBar onSearch={handleSearch} />
-                    </div>
-                    <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
+        <>
+            {isLandingPageMounted && <LandingPage onEnter={handleEnterApp} isExiting={isAppEntered} />}
+
+            <div className={`grid h-screen font-sans transition-opacity duration-500 ${isAppEntered ? 'opacity-100' : 'opacity-0'} ${currentTrack ? 'grid-rows-[1fr_auto]' : 'grid-rows-1'} grid-cols-1 md:grid-cols-[250px_1fr] bg-dark-bg text-dark-text`}>
+                <Sidebar activeView={activeView} setActiveView={setActiveView} />
+
+                <div className="flex flex-col overflow-hidden bg-dark-highlight">
+                    {activeView !== 'channel' && (
+                        <div className="flex-shrink-0 pt-6 pb-4 px-2 md:px-4">
+                            <h1 className="container mx-auto text-3xl md:text-4xl font-bold text-white">
+                                {viewTitles[activeView]}
+                            </h1>
+                        </div>
+                    )}
+                    
+                    <header className="flex-shrink-0 z-10 p-2 md:p-4">
+                        <div className="container mx-auto flex items-center justify-between">
+                            <div className="flex-1 max-w-lg">
+                                <SearchBar onSearch={handleSearch} />
+                            </div>
+                            <div className="flex items-center space-x-4">
+                               <ApiStatusIndicator status={apiStatus} />
+                               <ThemeToggle theme={theme} toggleTheme={() => setTheme(p => p === 'light' ? 'dark' : 'light')} />
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="flex-grow p-2 md:p-4 overflow-y-auto pb-36 md:pb-4 bg-gradient-to-b from-dark-highlight to-dark-bg rounded-t-lg">
+                        <div className="container mx-auto">
+                           {renderMainView()}
+                        </div>
+                    </main>
                 </div>
-            </header>
-
-            <main className="flex-grow container mx-auto px-4 py-4 overflow-y-auto" style={{paddingBottom: '100px'}}>
-                {error && <div className="text-center text-red-500 bg-red-100 dark:bg-red-900/50 p-3 rounded-md">{error}</div>}
                 
-                {activeView === 'tabs' && (
-                    <TabView
-                        searchResults={
-                            <SearchResultList
-                                results={listItems}
-                                isLoading={listIsLoading}
-                                onSelectTrack={handleSelectTrack}
-                                onAddToPlaylist={handleAddToPlaylist}
-                                onSelectChannel={handleSelectChannel}
-                                playlist={playlist}
-                                viewType={viewType}
-                                onGenerateDiscoveryMix={handleGenerateDiscoveryMix}
-                                offlineItems={offlineItems}
-                                onAddToOffline={handleAddToOffline}
-                            />
-                        }
-                        playlist={
-                            <Playlist
-                                playlist={playlist}
-                                onSelectTrack={handleSelectTrack}
-                                onRemoveFromPlaylist={handleRemoveFromPlaylist}
-                                onSelectChannel={handleSelectChannel}
-                                currentTrackId={currentTrack?.id.videoId}
-                                isAutoplayEnabled={isAutoplayEnabled}
-                                onToggleAutoplay={handleToggleAutoplay}
-                                offlineItems={offlineItems}
-                                onAddToOffline={handleAddToOffline}
-                            />
-                        }
-                        history={
-                            <HistoryList
-                                history={history}
-                                onSelectTrack={handleSelectTrack}
-                                onAddToPlaylist={handleAddToPlaylist}
-                                onSelectChannel={handleSelectChannel}
-                                offlineItems={offlineItems}
-                                onAddToOffline={handleAddToOffline}
-                            />
-                        }
-                        offline={
-                            <OfflineList
-                                offlinePlaylist={offlineItems}
-                                onSelectTrack={handleSelectTrack}
-                                onRemoveFromOfflinePlaylist={handleRemoveFromOffline}
-                                onSelectChannel={handleSelectChannel}
-                                currentTrackId={currentTrack?.id.videoId}
-                            />
-                        }
-                    />
-                )}
-                
-                {activeView === 'channel' && selectedChannel && (
-                    <ChannelView
-                        channelTitle={selectedChannel.title}
-                        videos={channelVideos}
-                        isLoading={isChannelLoading}
-                        onSelectTrack={handleSelectTrack}
-                        onAddToPlaylist={handleAddToPlaylist}
-                        onBack={handleBackToTabs}
-                        playlist={playlist}
-                        offlineItems={offlineItems}
-                        onAddToOffline={handleAddToOffline}
-                    />
-                )}
-
-            </main>
-
-            {currentTrack && (
-                <>
-                    <footer ref={footerRef} className="fixed bottom-0 left-0 right-0 z-30">
+                {currentTrack && !isMiniPlayerActive && (
+                    <footer className="col-span-1 md:col-span-2 z-30">
                         <Player
                             track={currentTrack}
                             isPlaying={isPlaying}
                             setIsPlaying={setIsPlaying}
                             onNext={playNext}
                             onPrev={playPrev}
-                            onToggleNowPlaying={openNowPlayingView}
+                            onToggleNowPlaying={() => setIsNowPlayingViewOpen(true)}
                             volume={volume}
                             setVolume={setVolume}
                             currentTime={currentTime}
                             duration={duration}
+                            seekTo={seekTo}
                             onSelectChannel={handleSelectChannel}
+                            onToggleMiniPlayer={() => setIsMiniPlayerActive(p => !p)}
                         />
                     </footer>
+                )}
+                
+                {currentTrack && isMiniPlayerActive && (
+                    <FloatingPlayer
+                        track={currentTrack}
+                        isPlaying={isPlaying}
+                        setIsPlaying={setIsPlaying}
+                        onNext={playNext}
+                        onPrev={playPrev}
+                        onClose={() => setIsMiniPlayerActive(false)}
+                    />
+                )}
+
+                {currentTrack && (
                     <NowPlayingView
                         isOpen={isNowPlayingViewOpen}
-                        onClose={closeNowPlayingView}
+                        onClose={() => setIsNowPlayingViewOpen(false)}
                         track={currentTrack}
                         isPlaying={isPlaying}
                         setIsPlaying={setIsPlaying}
@@ -425,21 +408,12 @@ const App: React.FC = () => {
                         duration={duration}
                         seekTo={seekTo}
                         isAutoplayEnabled={isAutoplayEnabled}
-                        onToggleAutoplay={handleToggleAutoplay}
+                        onToggleAutoplay={() => setIsAutoplayEnabled(p => !p)}
                     />
-                    {isMiniPlayerVisible && (
-                        <FloatingPlayer
-                            track={currentTrack}
-                            isPlaying={isPlaying}
-                            setIsPlaying={setIsPlaying}
-                            onNext={playNext}
-                            onPrev={playPrev}
-                            onClose={() => setIsMiniPlayerVisible(false)}
-                        />
-                    )}
-                </>
-            )}
-        </div>
+                )}
+            </div>
+            <BottomNavBar activeView={activeView} setActiveView={setActiveView} />
+        </>
     );
 };
 

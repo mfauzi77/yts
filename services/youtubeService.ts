@@ -23,11 +23,15 @@ const fetchFromApi = async (params: URLSearchParams): Promise<VideoItem[]> => {
 
         if (response.ok) {
             const data = await response.json();
-            return data.items;
+            // FIX: Filter out results that are not videos (i.e., don't have a valid, non-empty videoId)
+            if (data.items && Array.isArray(data.items)) {
+                return data.items.filter(item => item.id && typeof item.id.videoId === 'string' && item.id.videoId);
+            }
+            return []; // Return empty array if items are missing or not an array
         }
 
         const errorData = await response.json();
-        console.error('YouTube API Error:', errorData);
+        console.error('YouTube API Error:', JSON.stringify(errorData, null, 2));
 
         // Jika kuota habis atau kunci tidak valid, coba kunci berikutnya
         if (response.status === 403 || (response.status === 400 && errorData?.error?.message.includes('API key not valid'))) {
@@ -40,7 +44,8 @@ const fetchFromApi = async (params: URLSearchParams): Promise<VideoItem[]> => {
         }
 
         // Untuk galat API spesifik lainnya
-        throw new Error(`Permintaan API YouTube gagal dengan status ${response.status}: ${errorData.error.message}`);
+        const errorMessage = errorData.error?.message || 'Unknown API error';
+        throw new Error(`Permintaan API YouTube gagal dengan status ${response.status}: ${errorMessage}`);
 
     } catch (error) {
         console.error("Gagal melakukan fetch:", error);
@@ -54,7 +59,8 @@ const fetchFromApi = async (params: URLSearchParams): Promise<VideoItem[]> => {
 
 
 export const searchVideos = async (query: string): Promise<VideoItem[]> => {
-  if (!query || !query.trim()) {
+  if (typeof query !== 'string' || !query.trim()) {
+    console.warn('searchVideos called with an invalid query:', query);
     return [];
   }
   const params = new URLSearchParams({
@@ -67,9 +73,9 @@ export const searchVideos = async (query: string): Promise<VideoItem[]> => {
 };
 
 export const getRelatedVideos = async (videoId: string): Promise<VideoItem[]> => {
-    if (!videoId || !videoId.trim()) {
-        console.warn('getRelatedVideos called with an empty or invalid videoId.');
-        return []; // Return an empty array to prevent an API error.
+    if (typeof videoId !== 'string' || !videoId.trim()) {
+        console.warn('getRelatedVideos called with an invalid videoId:', videoId);
+        return [];
     }
     const params = new URLSearchParams({
         part: 'snippet',
@@ -81,9 +87,9 @@ export const getRelatedVideos = async (videoId: string): Promise<VideoItem[]> =>
 };
 
 export const getChannelVideos = async (channelId: string): Promise<VideoItem[]> => {
-    if (!channelId || !channelId.trim()) {
-        console.warn('getChannelVideos called with an empty or invalid channelId.');
-        return []; // Return an empty array to prevent an API error.
+    if (typeof channelId !== 'string' || !channelId.trim()) {
+        console.warn('getChannelVideos called with an invalid channelId:', channelId);
+        return [];
     }
     const params = new URLSearchParams({
         part: 'snippet',

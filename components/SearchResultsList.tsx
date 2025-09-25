@@ -12,6 +12,7 @@ interface SearchResultListProps {
   onGenerateDiscoveryMix: () => void;
   offlineItems: VideoItem[];
   onAddToOffline: (track: VideoItem) => void;
+  currentTrackId?: string | null;
 }
 
 const SearchResultItem: React.FC<{
@@ -22,33 +23,40 @@ const SearchResultItem: React.FC<{
     isInPlaylist: boolean;
     isOffline: boolean;
     onAddToOffline: (track: VideoItem) => void;
-}> = ({ item, onSelectTrack, onAddToPlaylist, onSelectChannel, isInPlaylist, isOffline, onAddToOffline }) => (
-    <div className="flex items-center p-3 space-x-4 bg-white dark:bg-dark-card rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-dark-surface transition-colors duration-200">
-        <img
-            src={item.snippet.thumbnails.default.url}
-            alt={item.snippet.title}
-            className="w-16 h-16 rounded-md object-cover cursor-pointer"
-            onClick={() => onSelectTrack(item, [])}
-        />
-        <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold truncate text-gray-900 dark:text-white cursor-pointer" onClick={() => onSelectTrack(item, [])}>
+    isPlaying: boolean;
+}> = ({ item, onSelectTrack, onAddToPlaylist, onSelectChannel, isInPlaylist, isOffline, onAddToOffline, isPlaying }) => (
+    <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
+        <div className="relative w-12 h-12">
+            <img
+                src={item.snippet.thumbnails.default.url}
+                alt={item.snippet.title}
+                className="w-full h-full rounded-md object-cover"
+            />
+             <button
+                onClick={() => onSelectTrack(item, [])}
+                className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-md"
+                aria-label={`Play ${item.snippet.title}`}
+            >
+                <i className="fas fa-play text-white text-lg"></i>
+            </button>
+        </div>
+        <div className="min-w-0">
+            <p className={`text-sm font-semibold truncate ${isPlaying ? 'text-brand-red' : 'text-white'}`}>
                 {item.snippet.title}
             </p>
             <p 
-                className="text-xs text-gray-500 dark:text-dark-subtext cursor-pointer hover:underline"
+                className="text-xs text-dark-subtext cursor-pointer hover:underline"
                 onClick={() => onSelectChannel(item.snippet.channelId, item.snippet.channelTitle)}
             >
                 {item.snippet.channelTitle}
             </p>
         </div>
-        <div className="flex items-center space-x-1 flex-shrink-0">
+        <div className="flex items-center space-x-1 flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
             <button
                 onClick={() => onAddToOffline(item)}
                 disabled={isOffline}
                 className={`p-2 w-10 rounded-full transition-colors duration-200 ${
-                    isOffline
-                        ? 'text-green-500 cursor-not-allowed'
-                        : 'text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600 hover:text-brand-red'
+                    isOffline ? 'text-green-500' : 'text-dark-subtext hover:text-white'
                 }`}
                 title={isOffline ? "Saved for offline" : "Save for offline"}
             >
@@ -58,9 +66,7 @@ const SearchResultItem: React.FC<{
                 onClick={() => onAddToPlaylist(item)}
                 disabled={isInPlaylist}
                 className={`p-2 w-10 rounded-full transition-colors duration-200 ${
-                    isInPlaylist
-                        ? 'text-green-500 cursor-not-allowed'
-                        : 'text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600 hover:text-brand-red'
+                    isInPlaylist ? 'text-green-500' : 'text-dark-subtext hover:text-white'
                 }`}
                 title={isInPlaylist ? "Added to playlist" : "Add to playlist"}
             >
@@ -71,7 +77,7 @@ const SearchResultItem: React.FC<{
 );
 
 
-export const SearchResultList: React.FC<SearchResultListProps> = ({ results, isLoading, onSelectTrack, onAddToPlaylist, onSelectChannel, playlist, viewType, onGenerateDiscoveryMix, offlineItems, onAddToOffline }) => {
+export const SearchResultList: React.FC<SearchResultListProps> = ({ results, isLoading, onSelectTrack, onAddToPlaylist, onSelectChannel, playlist, viewType, onGenerateDiscoveryMix, offlineItems, onAddToOffline, currentTrackId }) => {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -81,57 +87,50 @@ export const SearchResultList: React.FC<SearchResultListProps> = ({ results, isL
   }
 
   const discoveryMixButton = (
-    <div className="mb-4 text-center">
+    <div className="mb-6">
         <button 
             onClick={onGenerateDiscoveryMix}
             disabled={isLoading}
-            className="px-6 py-3 bg-brand-red text-white font-semibold rounded-full hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-brand-red/50 transition-all duration-200 ease-in-out shadow-lg hover:shadow-xl transform hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-lg"
+            className="px-6 py-3 bg-brand-red text-white font-semibold rounded-full hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-brand-red/50 transition-all duration-200 ease-in-out shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-lg"
         >
             <i className="fas fa-magic mr-2"></i>
             Generate My Discovery Mix
         </button>
     </div>
   );
-
+  
   if (results.length === 0 && !isLoading) {
-    if (viewType === 'recommendations') {
-        return (
-            <div className="text-center py-10 text-gray-500 dark:text-dark-subtext">
-                {discoveryMixButton}
-                <i className="fas fa-music text-4xl mb-4 mt-6"></i>
-                <p>Your personalized recommendations will appear here.</p>
-                <p className="text-sm">Listen to a few songs or create a playlist to get started.</p>
-            </div>
-        );
-    }
     return (
-        <div className="text-center py-10 text-gray-500 dark:text-dark-subtext">
-            <i className="fas fa-search text-4xl mb-4"></i>
-            <p>No results found for your search.</p>
-            <p className="text-sm">Try searching for something else, or clear the search bar to see recommendations.</p>
+        <div className="text-center py-10 text-dark-subtext">
+            {viewType === 'recommendations' && discoveryMixButton}
+            <i className={`fas ${viewType === 'search' ? 'fa-search' : 'fa-music'} text-4xl mb-4 mt-6`}></i>
+            <p>{viewType === 'search' ? 'No results found.' : 'Your personalized recommendations will appear here.'}</p>
+            <p className="text-sm">{viewType === 'search' ? 'Try a different search term.' : 'Listen to some songs to get started.'}</p>
         </div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      {viewType === 'recommendations' && discoveryMixButton}
-      {results.map(item => {
-        const isInPlaylist = playlist.some(pItem => pItem.id.videoId === item.id.videoId);
-        const isOffline = offlineItems.some(oItem => oItem.id.videoId === item.id.videoId);
-        return (
+    <div className="space-y-2">
+      {viewType === 'recommendations' && (
+        <div className="flex justify-start items-center mb-4">
+          {discoveryMixButton}
+        </div>
+      )}
+      {results.map(item => (
             <SearchResultItem
                 key={item.id.videoId}
                 item={item}
                 onSelectTrack={onSelectTrack}
                 onAddToPlaylist={onAddToPlaylist}
                 onSelectChannel={onSelectChannel}
-                isInPlaylist={isInPlaylist}
-                isOffline={isOffline}
+                isInPlaylist={playlist.some(p => p.id.videoId === item.id.videoId)}
+                isOffline={offlineItems.some(o => o.id.videoId === item.id.videoId)}
                 onAddToOffline={onAddToOffline}
+                isPlaying={currentTrackId === item.id.videoId}
             />
-        );
-      })}
+        )
+      )}
     </div>
   );
 };

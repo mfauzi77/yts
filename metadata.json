@@ -1,5 +1,5 @@
 {
-  "name": "React YouTube Audio Streamer",
-  "description": "A minimalist, modern, and legal YouTube audio streamer. Search for songs, create playlists, and listen to audio directly from YouTube without any downloads. Features a sleek interface, playback history, and a visualizer.",
+  "name": "YTS",
+  "description": "A minimalist, modern, and legal YouTube streamer. Search for songs, create playlists, and listen directly from YouTube. Features a sleek interface, playback history, and a visualizer.",
   "requestFramePermissions": []
 }

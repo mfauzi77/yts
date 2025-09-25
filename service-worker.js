@@ -1,6 +1,6 @@
 // Define cache names. Versioning helps in managing updates.
-const STATIC_CACHE_NAME = 'yt-audio-streamer-static-cache-v2';
-const DATA_CACHE_NAME = 'yt-audio-streamer-data-cache-v2';
+const STATIC_CACHE_NAME = 'yts-static-cache-v1';
+const DATA_CACHE_NAME = 'yts-data-cache-v1';
 
 // A list of files to be cached automatically during service worker installation.
 const URLS_TO_CACHE = [

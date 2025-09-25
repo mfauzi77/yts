@@ -6,7 +6,6 @@ interface AudioVisualizerCanvasProps {
 
 export const AudioVisualizerCanvas: React.FC<AudioVisualizerCanvasProps> = ({ isPlaying }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    // Fix: Provide an initial value to useRef as it is required when a generic type is specified.
     const animationFrameId = useRef<number | null>(null);
 
     useEffect(() => {

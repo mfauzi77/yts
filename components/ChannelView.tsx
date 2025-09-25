@@ -1,3 +1,4 @@
+
 import React from 'react';
 import type { VideoItem } from '../types';
 
@@ -5,43 +6,52 @@ interface ChannelViewProps {
   channelTitle: string;
   videos: VideoItem[];
   isLoading: boolean;
-  onSelectTrack: (track: VideoItem, contextList?: VideoItem[]) => void;
+  onSelectTrack: (track: VideoItem, contextList: VideoItem[]) => void;
   onAddToPlaylist: (track: VideoItem) => void;
   onBack: () => void;
   playlist: VideoItem[];
   offlineItems: VideoItem[];
   onAddToOffline: (track: VideoItem) => void;
+  currentTrackId?: string | null;
 }
 
 const ChannelVideoItem: React.FC<{
     item: VideoItem;
-    onSelectTrack: (track: VideoItem, contextList?: VideoItem[]) => void;
+    onSelectTrack: (track: VideoItem, contextList: VideoItem[]) => void;
     onAddToPlaylist: (track: VideoItem) => void;
     isInPlaylist: boolean;
     isOffline: boolean;
     onAddToOffline: (track: VideoItem) => void;
-}> = ({ item, onSelectTrack, onAddToPlaylist, isInPlaylist, isOffline, onAddToOffline }) => (
-    <div className="flex items-center p-3 space-x-4 bg-white dark:bg-dark-card rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-dark-surface transition-colors duration-200">
-        <img
-            src={item.snippet.thumbnails.default.url}
-            alt={item.snippet.title}
-            className="w-16 h-16 rounded-md object-cover cursor-pointer"
-            onClick={() => onSelectTrack(item, [])}
-        />
-        <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold truncate text-gray-900 dark:text-white cursor-pointer" onClick={() => onSelectTrack(item, [])}>
+    isPlaying: boolean;
+    videoList: VideoItem[];
+}> = ({ item, onSelectTrack, onAddToPlaylist, isInPlaylist, isOffline, onAddToOffline, isPlaying, videoList }) => (
+    <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
+        <div className="relative w-12 h-12">
+            <img
+                src={item.snippet.thumbnails.default.url}
+                alt={item.snippet.title}
+                className="w-full h-full rounded-md object-cover"
+            />
+             <button
+                onClick={() => onSelectTrack(item, videoList)}
+                className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-md"
+                aria-label={`Play ${item.snippet.title}`}
+            >
+                <i className="fas fa-play text-white text-lg"></i>
+            </button>
+        </div>
+        <div className="min-w-0">
+            <p className={`text-sm font-semibold truncate cursor-pointer ${isPlaying ? 'text-brand-red' : 'text-white'}`} onClick={() => onSelectTrack(item, videoList)}>
                 {item.snippet.title}
             </p>
-            <p className="text-xs text-gray-500 dark:text-dark-subtext">{new Date(item.snippet.publishedAt).toLocaleDateString()}</p>
+             {/* Channel title is omitted as it's redundant in this view */}
         </div>
-        <div className="flex items-center space-x-1 flex-shrink-0">
+        <div className="flex items-center space-x-1 flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
             <button
                 onClick={() => onAddToOffline(item)}
                 disabled={isOffline}
                 className={`p-2 w-10 rounded-full transition-colors duration-200 ${
-                    isOffline
-                        ? 'text-green-500 cursor-not-allowed'
-                        : 'text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600 hover:text-brand-red'
+                    isOffline ? 'text-green-500' : 'text-dark-subtext hover:text-white'
                 }`}
                 title={isOffline ? "Saved for offline" : "Save for offline"}
             >
@@ -51,9 +61,7 @@ const ChannelVideoItem: React.FC<{
                 onClick={() => onAddToPlaylist(item)}
                 disabled={isInPlaylist}
                 className={`p-2 w-10 rounded-full transition-colors duration-200 ${
-                    isInPlaylist
-                        ? 'text-green-500 cursor-not-allowed'
-                        : 'text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600 hover:text-brand-red'
+                    isInPlaylist ? 'text-green-500' : 'text-dark-subtext hover:text-white'
                 }`}
                 title={isInPlaylist ? "Added to playlist" : "Add to playlist"}
             >
@@ -63,59 +71,41 @@ const ChannelVideoItem: React.FC<{
     </div>
 );
 
-const ChannelVideoItemSkeleton: React.FC = () => (
-    <div className="flex items-center p-3 space-x-4 bg-white dark:bg-dark-card rounded-lg shadow-sm">
-        <div className="w-16 h-16 rounded-md bg-gray-300 dark:bg-gray-700 animate-pulse"></div>
-        <div className="flex-1 min-w-0 space-y-2 py-2">
-            <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-3/4 animate-pulse"></div>
-            <div className="h-3 bg-gray-300 dark:bg-gray-700 rounded w-1/2 animate-pulse"></div>
-        </div>
-        <div className="flex-shrink-0">
-            <div className="w-8 h-8 rounded-full bg-gray-300 dark:bg-gray-700 animate-pulse"></div>
-        </div>
-    </div>
-);
 
-export const ChannelView: React.FC<ChannelViewProps> = ({ channelTitle, videos, isLoading, onSelectTrack, onAddToPlaylist, onBack, playlist, offlineItems, onAddToOffline }) => {
+export const ChannelView: React.FC<ChannelViewProps> = ({ channelTitle, videos, isLoading, onSelectTrack, onAddToPlaylist, onBack, playlist, offlineItems, onAddToOffline, currentTrackId }) => {
     
     return (
-        <div>
-            <div className="flex items-center mb-4">
-                <button 
-                    onClick={onBack} 
-                    className="p-2 mr-4 rounded-full hover:bg-gray-200 dark:hover:bg-dark-surface transition-colors"
-                    aria-label="Back to main view"
-                >
-                    <i className="fas fa-arrow-left"></i>
+        <>
+            <div className="flex-shrink-0 pt-6 pb-4 px-2 md:px-0 flex items-center">
+                <button onClick={onBack} className="md:hidden p-2 mr-2 -ml-2 rounded-full hover:bg-dark-surface">
+                    <i className="fas fa-arrow-left text-white"></i>
                 </button>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white truncate">{channelTitle}</h2>
+                <h1 className="text-3xl md:text-4xl font-bold text-white truncate">
+                    {channelTitle}
+                </h1>
             </div>
-            
+
             {isLoading ? (
-                <div className="space-y-3">
-                    {Array.from({ length: 10 }).map((_, index) => (
-                        <ChannelVideoItemSkeleton key={index} />
-                    ))}
+                 <div className="flex justify-center items-center h-64">
+                    <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-brand-red"></div>
                 </div>
             ) : (
-                <div className="space-y-3">
-                    {videos.map(item => {
-                        const isInPlaylist = playlist.some(pItem => pItem.id.videoId === item.id.videoId);
-                        const isOffline = offlineItems.some(oItem => oItem.id.videoId === item.id.videoId);
-                        return (
-                            <ChannelVideoItem
-                                key={item.id.videoId}
-                                item={item}
-                                onSelectTrack={onSelectTrack}
-                                onAddToPlaylist={onAddToPlaylist}
-                                isInPlaylist={isInPlaylist}
-                                isOffline={isOffline}
-                                onAddToOffline={onAddToOffline}
-                            />
-                        )
-                    })}
+                <div className="space-y-1">
+                    {videos.map(item => (
+                        <ChannelVideoItem
+                            key={item.id.videoId}
+                            item={item}
+                            onSelectTrack={onSelectTrack}
+                            onAddToPlaylist={onAddToPlaylist}
+                            isInPlaylist={playlist.some(p => p.id.videoId === item.id.videoId)}
+                            isOffline={offlineItems.some(o => o.id.videoId === item.id.videoId)}
+                            onAddToOffline={onAddToOffline}
+                            isPlaying={currentTrackId === item.id.videoId}
+                            videoList={videos}
+                        />
+                    ))}
                 </div>
             )}
-        </div>
+        </>
     );
 };

@@ -1,68 +1,103 @@
+
 import React from 'react';
 import type { VideoItem } from '../types';
 
 interface HistoryListProps {
   history: VideoItem[];
-  onSelectTrack: (track: VideoItem, contextList?: VideoItem[]) => void;
+  onSelectTrack: (track: VideoItem, contextList: VideoItem[]) => void;
   onAddToPlaylist: (track: VideoItem) => void;
   onSelectChannel: (channelId: string, channelTitle: string) => void;
   offlineItems: VideoItem[];
   onAddToOffline: (track: VideoItem) => void;
+  currentTrackId?: string | null;
 }
 
-export const HistoryList: React.FC<HistoryListProps> = ({ history, onSelectTrack, onAddToPlaylist, onSelectChannel, offlineItems, onAddToOffline }) => {
+const HistoryItem: React.FC<{
+    item: VideoItem;
+    onSelectTrack: (track: VideoItem, contextList: VideoItem[]) => void;
+    onAddToPlaylist: (track: VideoItem) => void;
+    onSelectChannel: (channelId: string, channelTitle: string) => void;
+    isOffline: boolean;
+    onAddToOffline: (track: VideoItem) => void;
+    isPlaying: boolean;
+    history: VideoItem[];
+}> = ({ item, onSelectTrack, onAddToPlaylist, onSelectChannel, isOffline, onAddToOffline, isPlaying, history }) => (
+    <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
+        <div className="relative w-12 h-12">
+            <img
+                src={item.snippet.thumbnails.default.url}
+                alt={item.snippet.title}
+                className="w-full h-full rounded-md object-cover"
+            />
+             <button
+                onClick={() => onSelectTrack(item, history)}
+                className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-md"
+                aria-label={`Play ${item.snippet.title}`}
+            >
+                <i className="fas fa-play text-white text-lg"></i>
+            </button>
+        </div>
+        <div className="min-w-0">
+            <p className={`text-sm font-semibold truncate cursor-pointer ${isPlaying ? 'text-brand-red' : 'text-white'}`} onClick={() => onSelectTrack(item, history)}>
+                {item.snippet.title}
+            </p>
+            <p 
+                className="text-xs text-dark-subtext cursor-pointer hover:underline"
+                onClick={() => onSelectChannel(item.snippet.channelId, item.snippet.channelTitle)}
+            >
+                {item.snippet.channelTitle}
+            </p>
+        </div>
+        <div className="flex items-center space-x-1 flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+            <button
+                onClick={() => onAddToOffline(item)}
+                disabled={isOffline}
+                className={`p-2 w-10 rounded-full transition-colors duration-200 ${
+                    isOffline ? 'text-green-500' : 'text-dark-subtext hover:text-white'
+                }`}
+                title={isOffline ? "Saved for offline" : "Save for offline"}
+            >
+                <i className={`fas ${isOffline ? 'fa-check-circle' : 'fa-cloud-download-alt'}`}></i>
+            </button>
+            <button
+                onClick={() => onAddToPlaylist(item)}
+                className={`p-2 w-10 rounded-full text-dark-subtext hover:text-white transition-colors duration-200`}
+                title="Add to playlist"
+            >
+                <i className={`fas fa-plus`}></i>
+            </button>
+        </div>
+    </div>
+);
+
+export const HistoryList: React.FC<HistoryListProps> = ({ history, onSelectTrack, onAddToPlaylist, onSelectChannel, offlineItems, onAddToOffline, currentTrackId }) => {
   if (history.length === 0) {
     return (
-      <div className="text-center py-10 text-gray-500 dark:text-dark-subtext">
+      <div className="text-center py-10 text-dark-subtext">
         <i className="fas fa-history text-4xl mb-4"></i>
         <p>Your listening history is empty.</p>
-        <p className="text-sm">Played songs will appear here.</p>
+        <p className="text-sm">Songs you play will appear here.</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      {history.map(item => {
-        const isOffline = offlineItems.some(oItem => oItem.id.videoId === item.id.videoId);
+    <div className="space-y-1">
+      {history.map((item) => {
+        const isOffline = offlineItems.some(o => o.id.videoId === item.id.videoId);
         return (
-            <div key={item.id.videoId + item.snippet.publishedAt} className="flex items-center p-3 space-x-4 bg-white dark:bg-dark-card rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-dark-surface transition-colors duration-200">
-              <img
-                src={item.snippet.thumbnails.default.url}
-                alt={item.snippet.title}
-                className="w-12 h-12 rounded-md object-cover cursor-pointer"
-                onClick={() => onSelectTrack(item, [])}
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate text-gray-900 dark:text-white cursor-pointer" onClick={() => onSelectTrack(item, [])}>
-                  {item.snippet.title}
-                </p>
-                <p 
-                    className="text-xs text-gray-500 dark:text-dark-subtext cursor-pointer hover:underline"
-                    onClick={() => onSelectChannel(item.snippet.channelId, item.snippet.channelTitle)}
-                >
-                    {item.snippet.channelTitle}
-                </p>
-              </div>
-               <div className="flex items-center space-x-1 flex-shrink-0">
-                    <button
-                        onClick={() => onAddToOffline(item)}
-                        disabled={isOffline}
-                        className={`p-2 w-10 rounded-full transition-colors duration-200 ${
-                            isOffline
-                                ? 'text-green-500 cursor-not-allowed'
-                                : 'text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600 hover:text-brand-red'
-                        }`}
-                        title={isOffline ? "Saved for offline" : "Save for offline"}
-                    >
-                        <i className={`fas ${isOffline ? 'fa-check-circle' : 'fa-cloud-download-alt'}`}></i>
-                    </button>
-                    <button onClick={() => onAddToPlaylist(item)} className="p-2 w-10 rounded-full text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600 hover:text-brand-red transition-colors duration-200" title="Add to playlist">
-                        <i className="fas fa-plus"></i>
-                    </button>
-                </div>
-            </div>
-        )
+            <HistoryItem 
+                key={item.id.videoId} 
+                item={item}
+                onSelectTrack={onSelectTrack}
+                onAddToPlaylist={onAddToPlaylist}
+                onSelectChannel={onSelectChannel}
+                isPlaying={currentTrackId === item.id.videoId}
+                isOffline={isOffline}
+                onAddToOffline={onAddToOffline}
+                history={history}
+            />
+        );
       })}
     </div>
   );

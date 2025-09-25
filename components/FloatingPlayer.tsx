@@ -17,12 +17,15 @@ export const FloatingPlayer: React.FC<FloatingPlayerProps> = ({ track, isPlaying
   const playerRef = useRef<HTMLDivElement>(null);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    isDragging.current = true;
-    dragStartPos.current = {
-      x: e.clientX - position.x,
-      y: e.clientY - position.y,
-    };
-    playerRef.current?.classList.add('cursor-grabbing');
+    // Only allow dragging from the image
+    if ((e.target as HTMLElement).closest('.drag-handle')) {
+        isDragging.current = true;
+        dragStartPos.current = {
+            x: e.clientX - position.x,
+            y: e.clientY - position.y,
+        };
+        playerRef.current?.classList.add('cursor-grabbing');
+    }
   };
 
   const handleMouseUp = () => {
@@ -39,10 +42,10 @@ export const FloatingPlayer: React.FC<FloatingPlayerProps> = ({ track, isPlaying
       const playerWidth = playerRef.current?.offsetWidth || 300;
       const playerHeight = playerRef.current?.offsetHeight || 88;
       
-      if (newX < 0) newX = 0;
-      if (newY < 0) newY = 0;
-      if (newX + playerWidth > window.innerWidth) newX = window.innerWidth - playerWidth;
-      if (newY + playerHeight > window.innerHeight) newY = window.innerHeight - playerHeight;
+      if (newX < 16) newX = 16;
+      if (newY < 16) newY = 16;
+      if (newX + playerWidth > window.innerWidth - 16) newX = window.innerWidth - playerWidth - 16;
+      if (newY + playerHeight > window.innerHeight - 16) newY = window.innerHeight - playerHeight - 16;
 
 
       setPosition({ x: newX, y: newY });
@@ -61,14 +64,14 @@ export const FloatingPlayer: React.FC<FloatingPlayerProps> = ({ track, isPlaying
   return (
     <div
       ref={playerRef}
-      className="fixed z-50 w-72 p-3 bg-white/80 dark:bg-dark-surface/80 backdrop-blur-md rounded-xl shadow-2xl flex items-center space-x-3 cursor-grab"
-      style={{ left: `${position.x}px`, top: `${position.y}px` }}
+      className="fixed z-50 w-72 p-3 bg-white/80 dark:bg-dark-surface/80 backdrop-blur-md rounded-xl shadow-2xl flex items-center space-x-3"
+      style={{ left: `${position.x}px`, top: `${position.y}px`, touchAction: 'none' }}
       onMouseDown={handleMouseDown}
     >
       <img
         src={track.snippet.thumbnails.default.url}
         alt={track.snippet.title}
-        className="w-16 h-16 rounded-lg object-cover flex-shrink-0 pointer-events-none"
+        className="w-16 h-16 rounded-lg object-cover flex-shrink-0 pointer-events-none drag-handle cursor-grab"
       />
       <div className="flex-grow min-w-0">
         <p className="text-sm font-bold text-gray-900 dark:text-white truncate pointer-events-none">{track.snippet.title}</p>
@@ -84,8 +87,13 @@ export const FloatingPlayer: React.FC<FloatingPlayerProps> = ({ track, isPlaying
           </button>
         </div>
       </div>
-       <button onClick={onClose} className="absolute top-1 right-1 w-6 h-6 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-300 dark:text-dark-subtext dark:hover:bg-dark-card transition-colors">
-            <i className="fas fa-times text-xs"></i>
+       <button 
+            onClick={onClose} 
+            className="absolute top-1 right-1 w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-300 dark:text-dark-subtext dark:hover:bg-dark-card transition-colors"
+            title="Expand Player"
+            aria-label="Expand player"
+        >
+            <i className="fas fa-expand-alt text-xs"></i>
         </button>
     </div>
   );

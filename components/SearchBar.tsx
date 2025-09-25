@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 
 interface SearchBarProps {
@@ -14,20 +13,17 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSearch }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex w-full">
+    <form onSubmit={handleSubmit} className="flex w-full relative">
+      <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+        <i className="fas fa-search text-dark-subtext"></i>
+      </div>
       <input
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search for a song..."
-        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-l-full focus:outline-none focus:ring-2 focus:ring-brand-red/50 bg-gray-100 dark:bg-dark-card dark:text-dark-text"
+        className="w-full pl-10 pr-4 py-2 border-none rounded-full focus:outline-none focus:ring-2 focus:ring-brand-red/70 bg-dark-card text-dark-text placeholder-dark-subtext"
       />
-      <button
-        type="submit"
-        className="px-6 py-2 bg-brand-red text-white rounded-r-full hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-brand-red/50 transition-colors duration-200"
-      >
-        <i className="fas fa-search"></i>
-      </button>
     </form>
   );
 };

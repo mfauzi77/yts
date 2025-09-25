@@ -1,6 +1,5 @@
 import { useState, useEffect, Dispatch, SetStateAction } from 'react';
 
-// Fix: Import Dispatch and SetStateAction from react to resolve "Cannot find namespace 'React'" error.
 export function useLocalStorage<T>(key: string, initialValue: T): [T, Dispatch<SetStateAction<T>>] {
   const [storedValue, setStoredValue] = useState<T>(() => {
     if (typeof window === 'undefined') {

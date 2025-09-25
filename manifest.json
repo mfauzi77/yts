@@ -1,6 +1,6 @@
 {
-  "short_name": "Audio Streamer",
-  "name": "React YouTube Audio Streamer",
+  "short_name": "YTS",
+  "name": "YTS - YouTube Streamer",
   "icons": [
     {
       "src": "/icons/icon-192x192.png",
@@ -17,5 +17,5 @@
   "display": "standalone",
   "theme_color": "#FF0000",
   "background_color": "#121212",
-  "description": "A minimalist, modern, and legal YouTube audio streamer."
+  "description": "A minimalist, modern, and legal YouTube streamer."
 }
