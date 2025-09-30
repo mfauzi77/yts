@@ -29,7 +29,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeView, setActiv
         <nav className="fixed bottom-0 left-0 right-0 z-40 flex md:hidden bg-dark-surface border-t border-dark-card/50">
             <NavItem
                 icon="fa-home"
-                label="Home"
+                label="Beranda"
                 isActive={activeView === 'home'}
                 onClick={() => setActiveView('home')}
             />
@@ -41,7 +41,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeView, setActiv
             />
             <NavItem
                 icon="fa-history"
-                label="History"
+                label="Riwayat"
                 isActive={activeView === 'history'}
                 onClick={() => setActiveView('history')}
             />

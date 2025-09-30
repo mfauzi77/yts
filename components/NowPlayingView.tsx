@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import type { VideoItem } from '../types';
 import { AudioVisualizerCanvas } from './AudioVisualizerCanvas';
@@ -18,6 +17,7 @@ interface NowPlayingViewProps {
   seekTo: (time: number) => void;
   isAutoplayEnabled: boolean;
   onToggleAutoplay: () => void;
+  children?: React.ReactNode;
 }
 
 const formatTime = (seconds: number) => {
@@ -29,7 +29,8 @@ const formatTime = (seconds: number) => {
 
 export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
     isOpen, onClose, track, isPlaying, setIsPlaying, onNext, onPrev,
-    volume, setVolume, currentTime, duration, seekTo, isAutoplayEnabled, onToggleAutoplay
+    volume, setVolume, currentTime, duration, seekTo, isAutoplayEnabled, onToggleAutoplay,
+    children
 }) => {
     const [showVisualizer, setShowVisualizer] = useState(false);
     
@@ -59,6 +60,8 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
                     transition-transform duration-300 ease-in-out
                     ${isOpen ? 'translate-y-0' : 'translate-y-full md:translate-y-0'}
                 `}>
+                
+                {children}
 
                 {/* Mobile Handle */}
                 <div className="absolute top-2.5 w-10 h-1.5 bg-white/30 rounded-full md:hidden"></div>
@@ -66,7 +69,7 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
                  <button 
                     onClick={onClose} 
                     className="absolute top-4 right-4 md:top-6 md:right-6 w-10 h-10 flex items-center justify-center rounded-full bg-black/20 hover:bg-black/40 transition-colors" 
-                    aria-label="Close player view"
+                    aria-label="Tutup tampilan pemutar"
                 >
                     <i className="fas fa-chevron-down text-lg"></i>
                 </button>
@@ -109,7 +112,7 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
                     <div className="flex justify-center items-center space-x-4 md:space-x-8 my-2 md:my-4">
                         <button
                             onClick={() => setShowVisualizer(p => !p)}
-                            title="Toggle Visualizer"
+                            title="Alihkan Visualizer"
                             className={`w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-full text-white/80 hover:bg-white/10 ${showVisualizer ? 'text-brand-red' : ''}`}
                         >
                             <i className="fas fa-chart-bar text-lg md:text-xl"></i>
@@ -125,7 +128,7 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
                         </button>
                             <button
                             onClick={onToggleAutoplay}
-                            title="Toggle Autoplay"
+                            title="Alihkan Putar Otomatis"
                             className={`w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-full text-white/80 hover:bg-white/10 ${isAutoplayEnabled ? 'text-brand-red' : ''}`}
                         >
                             <i className="fas fa-redo-alt text-lg md:text-xl"></i>

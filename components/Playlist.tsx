@@ -27,7 +27,7 @@ const PlaylistItem: React.FC<{
     <div className="grid grid-cols-[20px_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
         <div className="flex items-center justify-center text-dark-subtext">
             <span className="group-hover:hidden">{index + 1}</span>
-            <button onClick={() => onSelectTrack(item, playlist)} className="hidden group-hover:block" aria-label={`Play ${item.snippet.title}`}>
+            <button onClick={() => onSelectTrack(item, playlist)} className="hidden group-hover:block" aria-label={`Putar ${item.snippet.title}`}>
                 <i className="fas fa-play text-white"></i>
             </button>
         </div>
@@ -56,11 +56,11 @@ const PlaylistItem: React.FC<{
                 className={`p-2 w-10 rounded-full transition-colors duration-200 ${
                     isOffline ? 'text-green-500' : 'text-dark-subtext hover:text-white'
                 }`}
-                title={isOffline ? "Saved for offline" : "Save for offline"}
+                title={isOffline ? "Disimpan offline" : "Simpan untuk offline"}
             >
                 <i className={`fas ${isOffline ? 'fa-check-circle' : 'fa-cloud-download-alt'}`}></i>
             </button>
-            <button onClick={() => onRemoveFromPlaylist(item.id.videoId)} className="p-2 w-10 rounded-full text-dark-subtext hover:text-white" title="Remove from playlist">
+            <button onClick={() => onRemoveFromPlaylist(item.id.videoId)} className="p-2 w-10 rounded-full text-dark-subtext hover:text-white" title="Hapus dari playlist">
                 <i className="fas fa-trash-alt"></i>
             </button>
         </div>
@@ -73,8 +73,8 @@ export const Playlist: React.FC<PlaylistProps> = ({ playlist, onSelectTrack, onR
     return (
       <div className="text-center py-10 text-dark-subtext">
         <i className="fas fa-list-ul text-4xl mb-4"></i>
-        <p>Your playlist is empty.</p>
-        <p className="text-sm">Add songs from search results to get started.</p>
+        <p>Playlist Anda kosong.</p>
+        <p className="text-sm">Tambahkan lagu dari hasil pencarian untuk memulai.</p>
       </div>
     );
   }
@@ -83,7 +83,7 @@ export const Playlist: React.FC<PlaylistProps> = ({ playlist, onSelectTrack, onR
     <div>
         <div className="flex items-center justify-end mb-4 pr-2">
             <div className="flex items-center">
-                <span className="mr-3 text-sm font-medium text-dark-subtext">Autoplay</span>
+                <span className="mr-3 text-sm font-medium text-dark-subtext">Putar Otomatis</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                     <input type="checkbox" checked={isAutoplayEnabled} onChange={onToggleAutoplay} className="sr-only peer" />
                     <div className="w-11 h-6 bg-dark-card peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-brand-red"></div>

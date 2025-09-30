@@ -90,8 +90,8 @@ export const FloatingPlayer: React.FC<FloatingPlayerProps> = ({ track, isPlaying
        <button 
             onClick={onClose} 
             className="absolute top-1 right-1 w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-300 dark:text-dark-subtext dark:hover:bg-dark-card transition-colors"
-            title="Expand Player"
-            aria-label="Expand player"
+            title="Perluas Pemutar"
+            aria-label="Perluas pemutar"
         >
             <i className="fas fa-expand-alt text-xs"></i>
         </button>

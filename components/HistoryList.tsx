@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { VideoItem } from '../types';
 
@@ -32,7 +31,7 @@ const HistoryItem: React.FC<{
              <button
                 onClick={() => onSelectTrack(item, history)}
                 className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-md"
-                aria-label={`Play ${item.snippet.title}`}
+                aria-label={`Putar ${item.snippet.title}`}
             >
                 <i className="fas fa-play text-white text-lg"></i>
             </button>
@@ -55,14 +54,14 @@ const HistoryItem: React.FC<{
                 className={`p-2 w-10 rounded-full transition-colors duration-200 ${
                     isOffline ? 'text-green-500' : 'text-dark-subtext hover:text-white'
                 }`}
-                title={isOffline ? "Saved for offline" : "Save for offline"}
+                title={isOffline ? "Disimpan offline" : "Simpan untuk offline"}
             >
                 <i className={`fas ${isOffline ? 'fa-check-circle' : 'fa-cloud-download-alt'}`}></i>
             </button>
             <button
                 onClick={() => onAddToPlaylist(item)}
                 className={`p-2 w-10 rounded-full text-dark-subtext hover:text-white transition-colors duration-200`}
-                title="Add to playlist"
+                title="Tambahkan ke playlist"
             >
                 <i className={`fas fa-plus`}></i>
             </button>
@@ -75,8 +74,8 @@ export const HistoryList: React.FC<HistoryListProps> = ({ history, onSelectTrack
     return (
       <div className="text-center py-10 text-dark-subtext">
         <i className="fas fa-history text-4xl mb-4"></i>
-        <p>Your listening history is empty.</p>
-        <p className="text-sm">Songs you play will appear here.</p>
+        <p>Riwayat mendengarkan Anda kosong.</p>
+        <p className="text-sm">Lagu yang Anda putar akan muncul di sini.</p>
       </div>
     );
   }

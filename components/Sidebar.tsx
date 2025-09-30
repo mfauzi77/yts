@@ -37,7 +37,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) =
             <nav className="flex flex-col space-y-2">
                 <NavLink 
                     icon="fa-home" 
-                    label="Home" 
+                    label="Beranda" 
                     isActive={activeView === 'home'} 
                     onClick={() => setActiveView('home')} 
                 />
@@ -49,13 +49,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) =
                 />
                  <NavLink 
                     icon="fa-history" 
-                    label="History" 
+                    label="Riwayat" 
                     isActive={activeView === 'history'} 
                     onClick={() => setActiveView('history')} 
                 />
                  <NavLink 
                     icon="fa-cloud-download-alt" 
-                    label="Offline Library" 
+                    label="Koleksi Offline" 
                     isActive={activeView === 'offline'} 
                     onClick={() => setActiveView('offline')} 
                 />

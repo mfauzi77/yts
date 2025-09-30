@@ -16,15 +16,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnter, isExiting }) 
         </h1>
         
         <p className="mt-2 text-lg text-gray-500 dark:text-dark-subtext">
-          Your Music, Uninterrupted.
+          Musikmu, Tanpa Gangguan.
         </p>
 
         <button
           onClick={onEnter}
           className="mt-10 px-8 py-3 bg-brand-red text-white font-semibold rounded-full hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-brand-red/50 transition-all duration-200 ease-in-out shadow-lg hover:shadow-xl transform hover:-translate-y-1"
-          aria-label="Start Listening"
+          aria-label="Mulai Mendengarkan"
         >
-          Start Listening
+          Mulai Mendengarkan
         </button>
       </div>
     </div>

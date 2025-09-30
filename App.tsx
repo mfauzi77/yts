@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { SearchBar } from './components/SearchBar';
 import { Player } from './components/Player';
 import { SearchResultList } from './components/SearchResultsList';
@@ -7,7 +7,6 @@ import { HistoryList } from './components/HistoryList';
 import { searchVideos, getChannelVideos, getRelatedVideos } from './services/youtubeService';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import type { VideoItem } from './types';
-import { ThemeToggle } from './components/ThemeToggle';
 import { useYouTubePlayer } from './hooks/useYouTubePlayer';
 import { NowPlayingView } from './components/NowPlayingView';
 import { ChannelView } from './components/ChannelView';
@@ -17,6 +16,8 @@ import { ApiStatusIndicator } from './components/ApiStatusIndicator';
 import { LandingPage } from './components/LandingPage';
 import { Sidebar } from './components/Sidebar';
 import { BottomNavBar } from './components/BottomNavBar';
+import { ErrorDisplay } from './components/ErrorDisplay';
+import { AutoplayOverlay } from './components/AutoplayOverlay';
 
 type MainView = 'home' | 'playlist' | 'history' | 'offline' | 'channel';
 type ApiStatus = 'idle' | 'success' | 'error';
@@ -36,23 +37,26 @@ const App: React.FC = () => {
     const [selectedChannel, setSelectedChannel] = useState<{ id: string; title: string } | null>(null);
     const [channelVideos, setChannelVideos] = useState<VideoItem[]>([]);
     const [isChannelLoading, setIsChannelLoading] = useState<boolean>(false);
+    const [isChannelMoreLoading, setIsChannelMoreLoading] = useState<boolean>(false);
+    const [channelNextPageToken, setChannelNextPageToken] = useState<string | undefined>(undefined);
     const [isMiniPlayerActive, setIsMiniPlayerActive] = useState(false);
     const [apiStatus, setApiStatus] = useState<ApiStatus>('idle');
     const [isAppEntered, setIsAppEntered] = useState<boolean>(false);
     const [isLandingPageMounted, setIsLandingPageMounted] = useState<boolean>(true);
+    const [isAutoplayBlocked, setIsAutoplayBlocked] = useState<boolean>(false);
 
     const [playlist, setPlaylist] = useLocalStorage<VideoItem[]>('ytas-playlist', []);
     const [history, setHistory] = useLocalStorage<VideoItem[]>('ytas-history', []);
     const [offlineItems, setOfflineItems] = useLocalStorage<VideoItem[]>('ytas-offline', []);
-    const [theme, setTheme] = useLocalStorage<'light' | 'dark'>('ytas-theme', 'dark');
     const [isAutoplayEnabled, setIsAutoplayEnabled] = useLocalStorage<boolean>('ytas-autoplay', true);
 
     const [activePlaybackList, setActivePlaybackList] = useState<VideoItem[]>([]);
     const currentTrackIndexRef = React.useRef(-1);
+    const isAttemptingAutoplay = useRef(false);
 
     const handleApiError = (err: unknown) => {
-        const message = err instanceof Error ? err.message : 'An unknown error occurred.';
-        console.error("API Error:", message);
+        const message = err instanceof Error ? err.message : 'Terjadi galat yang tidak diketahui.';
+        console.error("API Error:", err);
         setError(message);
         setApiStatus('error');
     };
@@ -64,11 +68,6 @@ const App: React.FC = () => {
         }
     }, [apiStatus]);
 
-
-    useEffect(() => {
-        document.documentElement.classList.toggle('dark', theme === 'dark');
-    }, [theme]);
-    
     useEffect(() => {
         if (!isAppEntered) return;
 
@@ -155,6 +154,7 @@ const App: React.FC = () => {
     const handleSelectTrack = useCallback((track: VideoItem, contextList: VideoItem[] = []) => {
         setCurrentTrack(track);
         setIsPlaying(true);
+        setIsAutoplayBlocked(false);
         addToHistory(track);
         setActivePlaybackList(contextList);
         currentTrackIndexRef.current = contextList.findIndex(item => item.id.videoId === track.id.videoId);
@@ -167,18 +167,21 @@ const App: React.FC = () => {
     
     const playNext = useCallback(() => {
         if (activePlaybackList.length === 0) return;
+        isAttemptingAutoplay.current = true;
         currentTrackIndexRef.current = (currentTrackIndexRef.current + 1) % activePlaybackList.length;
         handleSelectTrack(activePlaybackList[currentTrackIndexRef.current], activePlaybackList);
     }, [activePlaybackList, handleSelectTrack]);
 
     const playPrev = useCallback(() => {
         if (activePlaybackList.length === 0) return;
+        isAttemptingAutoplay.current = false;
         currentTrackIndexRef.current = (currentTrackIndexRef.current - 1 + activePlaybackList.length) % activePlaybackList.length;
         handleSelectTrack(activePlaybackList[currentTrackIndexRef.current], activePlaybackList);
     }, [activePlaybackList, handleSelectTrack]);
     
     const playRelatedVideo = useCallback(async () => {
         if (!currentTrack) return;
+        isAttemptingAutoplay.current = true;
         try {
             const relatedVideos = await getRelatedVideos(currentTrack.id.videoId);
             const nextTrack = relatedVideos.find(video => video.id.videoId !== currentTrack.id.videoId);
@@ -195,14 +198,26 @@ const App: React.FC = () => {
     }, [currentTrack, handleSelectTrack]);
     
     const handlePlayerStateChange = useCallback((event: { data: number }) => {
-        if (event.data === 0 && isAutoplayEnabled) {
+        // Player state codes: -1 (unstarted), 0 (ended), 1 (playing), 2 (paused), 3 (buffering), 5 (video cued)
+        if (isAttemptingAutoplay.current && (event.data === 2 || event.data === 5)) {
+             // Autoplay was blocked by the browser
+            setIsAutoplayBlocked(true);
+            setIsPlaying(false); // Correct the state
+            isAttemptingAutoplay.current = false;
+        } else if (event.data === 1) { // Playing
+            setIsPlaying(true);
+            setIsAutoplayBlocked(false);
+            isAttemptingAutoplay.current = false;
+        } else if (event.data === 2) { // Paused
+            setIsPlaying(false);
+            isAttemptingAutoplay.current = false;
+        } else if (event.data === 0 && isAutoplayEnabled) { // Ended
             if (currentTrackIndexRef.current !== -1 && activePlaybackList.length > 0) {
                 playNext();
             } else {
                 playRelatedVideo();
             }
-        } else if (event.data === 1) setIsPlaying(true);
-        else if (event.data === 2) setIsPlaying(false);
+        }
     }, [playNext, isAutoplayEnabled, activePlaybackList.length, playRelatedVideo]);
     
     const { volume, setVolume, seekTo, currentTime, duration } = useYouTubePlayer({
@@ -236,23 +251,50 @@ const App: React.FC = () => {
         setError(null);
         setSelectedChannel({ id: channelId, title: channelTitle });
         setActiveView('channel');
+        setChannelVideos([]);
+        setChannelNextPageToken(undefined);
         try {
-            const results = await getChannelVideos(channelId);
-            setChannelVideos(results);
+            const { items, nextPageToken } = await getChannelVideos(channelId, 'date', 50);
+            setChannelVideos(items);
+            setChannelNextPageToken(nextPageToken);
             setApiStatus('success');
         } catch (err) { handleApiError(err); } 
         finally { setIsChannelLoading(false); }
     }, []);
     
+    const handleLoadMoreChannelVideos = useCallback(async () => {
+        if (!selectedChannel || !channelNextPageToken || isChannelMoreLoading) return;
+
+        setIsChannelMoreLoading(true);
+        try {
+            const { items, nextPageToken } = await getChannelVideos(selectedChannel.id, 'date', 50, channelNextPageToken);
+            setChannelVideos(prev => [...prev, ...items]);
+            setChannelNextPageToken(nextPageToken);
+            setApiStatus('success');
+        } catch (err) {
+            handleApiError(err);
+        } finally {
+            setIsChannelMoreLoading(false);
+        }
+
+    }, [selectedChannel, channelNextPageToken, isChannelMoreLoading]);
+    
     const handleBackToTabs = (originView: MainView = 'home') => {
         setActiveView(originView);
         setSelectedChannel(null);
         setChannelVideos([]);
+        setChannelNextPageToken(undefined);
     };
     
     const handleEnterApp = () => {
         setIsAppEntered(true);
         setTimeout(() => setIsLandingPageMounted(false), 500);
+    };
+
+    const handleForcePlay = () => {
+        isAttemptingAutoplay.current = false;
+        setIsAutoplayBlocked(false);
+        setIsPlaying(true);
     };
 
     const renderMainView = () => {
@@ -308,23 +350,26 @@ const App: React.FC = () => {
                     channelTitle={selectedChannel.title}
                     videos={channelVideos}
                     isLoading={isChannelLoading}
+                    isMoreLoading={isChannelMoreLoading}
                     onSelectTrack={handleSelectTrack}
-                    onAddToPlaylist={handleAddToPlaylist}
                     onBack={() => handleBackToTabs()}
+                    onAddToPlaylist={handleAddToPlaylist}
+                    onAddToOffline={handleAddToOffline}
                     playlist={playlist}
                     offlineItems={offlineItems}
-                    onAddToOffline={handleAddToOffline}
                     currentTrackId={currentTrack?.id.videoId}
+                    onLoadMore={handleLoadMoreChannelVideos}
+                    hasNextPage={!!channelNextPageToken}
                 />;
             default: return null;
         }
     }
 
     const viewTitles: { [key in MainView]?: string } = {
-        home: 'Home',
+        home: 'Beranda',
         playlist: 'Playlist',
-        history: 'History',
-        offline: 'Offline Library',
+        history: 'Riwayat',
+        offline: 'Koleksi Offline',
     };
 
     return (
@@ -350,13 +395,13 @@ const App: React.FC = () => {
                             </div>
                             <div className="flex items-center space-x-4">
                                <ApiStatusIndicator status={apiStatus} />
-                               <ThemeToggle theme={theme} toggleTheme={() => setTheme(p => p === 'light' ? 'dark' : 'light')} />
                             </div>
                         </div>
                     </header>
 
                     <main className="flex-grow p-2 md:p-4 overflow-y-auto pb-36 md:pb-4 bg-gradient-to-b from-dark-highlight to-dark-bg rounded-t-lg">
                         <div className="container mx-auto">
+                           {error && <ErrorDisplay message={error} onDismiss={() => setError(null)} />}
                            {renderMainView()}
                         </div>
                     </main>
@@ -409,7 +454,11 @@ const App: React.FC = () => {
                         seekTo={seekTo}
                         isAutoplayEnabled={isAutoplayEnabled}
                         onToggleAutoplay={() => setIsAutoplayEnabled(p => !p)}
-                    />
+                    >
+                        {isAutoplayBlocked && (
+                            <AutoplayOverlay track={currentTrack} onForcePlay={handleForcePlay} />
+                        )}
+                   </NowPlayingView>
                 )}
             </div>
             <BottomNavBar activeView={activeView} setActiveView={setActiveView} />

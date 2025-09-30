@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { VideoItem } from '../types';
 
@@ -6,13 +5,16 @@ interface ChannelViewProps {
   channelTitle: string;
   videos: VideoItem[];
   isLoading: boolean;
+  isMoreLoading: boolean;
   onSelectTrack: (track: VideoItem, contextList: VideoItem[]) => void;
-  onAddToPlaylist: (track: VideoItem) => void;
   onBack: () => void;
+  onAddToPlaylist: (track: VideoItem) => void;
+  onAddToOffline: (track: VideoItem) => void;
   playlist: VideoItem[];
   offlineItems: VideoItem[];
-  onAddToOffline: (track: VideoItem) => void;
   currentTrackId?: string | null;
+  onLoadMore: () => void;
+  hasNextPage: boolean;
 }
 
 const ChannelVideoItem: React.FC<{
@@ -35,7 +37,7 @@ const ChannelVideoItem: React.FC<{
              <button
                 onClick={() => onSelectTrack(item, videoList)}
                 className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-md"
-                aria-label={`Play ${item.snippet.title}`}
+                aria-label={`Putar ${item.snippet.title}`}
             >
                 <i className="fas fa-play text-white text-lg"></i>
             </button>
@@ -44,7 +46,9 @@ const ChannelVideoItem: React.FC<{
             <p className={`text-sm font-semibold truncate cursor-pointer ${isPlaying ? 'text-brand-red' : 'text-white'}`} onClick={() => onSelectTrack(item, videoList)}>
                 {item.snippet.title}
             </p>
-             {/* Channel title is omitted as it's redundant in this view */}
+             <p className="text-xs text-dark-subtext">
+                {new Date(item.snippet.publishedAt).toLocaleDateString()}
+            </p>
         </div>
         <div className="flex items-center space-x-1 flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
             <button
@@ -53,7 +57,7 @@ const ChannelVideoItem: React.FC<{
                 className={`p-2 w-10 rounded-full transition-colors duration-200 ${
                     isOffline ? 'text-green-500' : 'text-dark-subtext hover:text-white'
                 }`}
-                title={isOffline ? "Saved for offline" : "Save for offline"}
+                title={isOffline ? "Disimpan offline" : "Simpan untuk offline"}
             >
                 <i className={`fas ${isOffline ? 'fa-check-circle' : 'fa-cloud-download-alt'}`}></i>
             </button>
@@ -63,7 +67,7 @@ const ChannelVideoItem: React.FC<{
                 className={`p-2 w-10 rounded-full transition-colors duration-200 ${
                     isInPlaylist ? 'text-green-500' : 'text-dark-subtext hover:text-white'
                 }`}
-                title={isInPlaylist ? "Added to playlist" : "Add to playlist"}
+                title={isInPlaylist ? "Ditambahkan ke playlist" : "Tambahkan ke playlist"}
             >
                 <i className={`fas ${isInPlaylist ? 'fa-check' : 'fa-plus'}`}></i>
             </button>
@@ -71,9 +75,21 @@ const ChannelVideoItem: React.FC<{
     </div>
 );
 
-
-export const ChannelView: React.FC<ChannelViewProps> = ({ channelTitle, videos, isLoading, onSelectTrack, onAddToPlaylist, onBack, playlist, offlineItems, onAddToOffline, currentTrackId }) => {
-    
+export const ChannelView: React.FC<ChannelViewProps> = ({ 
+    channelTitle, 
+    videos, 
+    isLoading, 
+    isMoreLoading,
+    onSelectTrack, 
+    onBack,
+    onAddToPlaylist,
+    onAddToOffline,
+    playlist,
+    offlineItems,
+    currentTrackId,
+    onLoadMore,
+    hasNextPage,
+}) => {
     return (
         <>
             <div className="flex-shrink-0 pt-6 pb-4 px-2 md:px-0 flex items-center">
@@ -90,9 +106,9 @@ export const ChannelView: React.FC<ChannelViewProps> = ({ channelTitle, videos, 
                     <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-brand-red"></div>
                 </div>
             ) : (
-                <div className="space-y-1">
-                    {videos.map(item => (
-                        <ChannelVideoItem
+                <div className="mt-4 space-y-2">
+                   {videos.map(item => (
+                       <ChannelVideoItem
                             key={item.id.videoId}
                             item={item}
                             onSelectTrack={onSelectTrack}
@@ -102,8 +118,27 @@ export const ChannelView: React.FC<ChannelViewProps> = ({ channelTitle, videos, 
                             onAddToOffline={onAddToOffline}
                             isPlaying={currentTrackId === item.id.videoId}
                             videoList={videos}
-                        />
-                    ))}
+                       />
+                   ))}
+                   
+                   {hasNextPage && (
+                       <div className="flex justify-center py-6">
+                           <button
+                               onClick={onLoadMore}
+                               disabled={isMoreLoading}
+                               className="px-6 py-2 bg-dark-card text-white font-semibold rounded-full hover:bg-dark-surface focus:outline-none focus:ring-2 focus:ring-brand-red/50 transition-colors disabled:opacity-50 disabled:cursor-wait"
+                           >
+                               {isMoreLoading ? (
+                                   <>
+                                       <i className="fas fa-spinner fa-spin mr-2"></i>
+                                       Memuat...
+                                   </>
+                               ) : (
+                                   'Muat Lebih Banyak'
+                               )}
+                           </button>
+                       </div>
+                   )}
                 </div>
             )}
         </>

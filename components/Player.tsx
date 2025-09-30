@@ -128,9 +128,9 @@ export const Player: React.FC<PlayerProps> = ({
                 <div className="flex items-center space-x-4 justify-end">
                     <button 
                         onClick={onToggleMiniPlayer} 
-                        title="Mini player" 
+                        title="Pemutar mini" 
                         className="p-2 rounded-full text-dark-subtext hover:bg-dark-card hover:text-white transition-colors"
-                        aria-label="Toggle mini player"
+                        aria-label="Alihkan pemutar mini"
                     >
                         <i className="far fa-window-minimize"></i>
                     </button>

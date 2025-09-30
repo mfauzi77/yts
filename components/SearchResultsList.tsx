@@ -35,7 +35,7 @@ const SearchResultItem: React.FC<{
              <button
                 onClick={() => onSelectTrack(item, [])}
                 className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-md"
-                aria-label={`Play ${item.snippet.title}`}
+                aria-label={`Putar ${item.snippet.title}`}
             >
                 <i className="fas fa-play text-white text-lg"></i>
             </button>
@@ -58,7 +58,7 @@ const SearchResultItem: React.FC<{
                 className={`p-2 w-10 rounded-full transition-colors duration-200 ${
                     isOffline ? 'text-green-500' : 'text-dark-subtext hover:text-white'
                 }`}
-                title={isOffline ? "Saved for offline" : "Save for offline"}
+                title={isOffline ? "Disimpan offline" : "Simpan untuk offline"}
             >
                 <i className={`fas ${isOffline ? 'fa-check-circle' : 'fa-cloud-download-alt'}`}></i>
             </button>
@@ -68,7 +68,7 @@ const SearchResultItem: React.FC<{
                 className={`p-2 w-10 rounded-full transition-colors duration-200 ${
                     isInPlaylist ? 'text-green-500' : 'text-dark-subtext hover:text-white'
                 }`}
-                title={isInPlaylist ? "Added to playlist" : "Add to playlist"}
+                title={isInPlaylist ? "Ditambahkan ke playlist" : "Tambahkan ke playlist"}
             >
                 <i className={`fas ${isInPlaylist ? 'fa-check' : 'fa-plus'}`}></i>
             </button>
@@ -94,7 +94,7 @@ export const SearchResultList: React.FC<SearchResultListProps> = ({ results, isL
             className="px-6 py-3 bg-brand-red text-white font-semibold rounded-full hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-brand-red/50 transition-all duration-200 ease-in-out shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-lg"
         >
             <i className="fas fa-magic mr-2"></i>
-            Generate My Discovery Mix
+            Buat Campuran Penemuan Saya
         </button>
     </div>
   );
@@ -104,8 +104,8 @@ export const SearchResultList: React.FC<SearchResultListProps> = ({ results, isL
         <div className="text-center py-10 text-dark-subtext">
             {viewType === 'recommendations' && discoveryMixButton}
             <i className={`fas ${viewType === 'search' ? 'fa-search' : 'fa-music'} text-4xl mb-4 mt-6`}></i>
-            <p>{viewType === 'search' ? 'No results found.' : 'Your personalized recommendations will appear here.'}</p>
-            <p className="text-sm">{viewType === 'search' ? 'Try a different search term.' : 'Listen to some songs to get started.'}</p>
+            <p>{viewType === 'search' ? 'Tidak ada hasil yang ditemukan.' : 'Rekomendasi pribadi Anda akan muncul di sini.'}</p>
+            <p className="text-sm">{viewType === 'search' ? 'Coba kata kunci pencarian yang lain.' : 'Dengarkan beberapa lagu untuk memulai.'}</p>
         </div>
     );
   }

@@ -22,7 +22,7 @@ const OfflineItem: React.FC<{
     <div className="grid grid-cols-[20px_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
         <div className="flex items-center justify-center text-dark-subtext">
             <span className="group-hover:hidden">{index + 1}</span>
-            <button onClick={() => onSelectTrack(item, offlinePlaylist)} className="hidden group-hover:block" aria-label={`Play ${item.snippet.title}`}>
+            <button onClick={() => onSelectTrack(item, offlinePlaylist)} className="hidden group-hover:block" aria-label={`Putar ${item.snippet.title}`}>
                 <i className="fas fa-play text-white"></i>
             </button>
         </div>
@@ -45,7 +45,7 @@ const OfflineItem: React.FC<{
             </div>
         </div>
         <div className="flex items-center space-x-1 flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-            <button onClick={() => onRemoveFromOfflinePlaylist(item.id.videoId)} className="p-2 w-10 rounded-full text-dark-subtext hover:text-white" title="Remove from Offline">
+            <button onClick={() => onRemoveFromOfflinePlaylist(item.id.videoId)} className="p-2 w-10 rounded-full text-dark-subtext hover:text-white" title="Hapus dari Offline">
                 <i className="fas fa-trash-alt"></i>
             </button>
         </div>
@@ -58,8 +58,8 @@ export const OfflineList: React.FC<OfflineListProps> = ({ offlinePlaylist, onSel
     return (
       <div className="text-center py-10 text-dark-subtext">
         <i className="fas fa-cloud-download-alt text-4xl mb-4"></i>
-        <p>You have no songs saved for offline access.</p>
-        <p className="text-sm">Click the cloud icon on a song to save it here.</p>
+        <p>Anda tidak memiliki lagu yang disimpan untuk akses offline.</p>
+        <p className="text-sm">Klik ikon awan pada lagu untuk menyimpannya di sini.</p>
       </div>
     );
   }

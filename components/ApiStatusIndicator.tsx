@@ -8,9 +8,9 @@ interface ApiStatusIndicatorProps {
 
 export const ApiStatusIndicator: React.FC<ApiStatusIndicatorProps> = ({ status }) => {
   const statusConfig = {
-    idle: { color: 'bg-gray-400', text: 'API Status: Idle' },
-    success: { color: 'bg-green-500', text: 'API Status: OK' },
-    error: { color: 'bg-red-500', text: 'API Status: Error' },
+    idle: { color: 'bg-gray-400', text: 'Status API: Idle' },
+    success: { color: 'bg-green-500', text: 'Status API: OK' },
+    error: { color: 'bg-red-500', text: 'Status API: Galat' },
   };
 
   const { color, text } = statusConfig[status];
