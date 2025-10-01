@@ -62,6 +62,12 @@ const fetchFromApiCore = async (endpoint: string, params: URLSearchParams): Prom
             return fetchFromApiCore(endpoint, params);
         }
 
+        // Gracefully handle invalid argument errors (e.g., for deleted videos)
+        if (response.status === 400 && errorData?.error?.message?.toLowerCase().includes('invalid argument')) {
+            console.warn('API returned 400: Invalid argument. Suppressing error and returning empty result.');
+            return { items: [] };
+        }
+
         const errorMessage = errorData.error?.message || 'Unknown API error';
         throw new Error(`Permintaan API YouTube gagal dengan status ${response.status}: ${errorMessage}`);
 

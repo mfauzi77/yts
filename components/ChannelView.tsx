@@ -43,7 +43,7 @@ const ChannelVideoItem: React.FC<{
             </button>
         </div>
         <div className="min-w-0">
-            <p className={`text-sm font-semibold truncate cursor-pointer ${isPlaying ? 'text-brand-red' : 'text-white'}`} onClick={() => onSelectTrack(item, videoList)}>
+            <p className={`text-sm font-semibold cursor-pointer ${isPlaying ? 'text-brand-red' : 'text-white'} [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden`} onClick={() => onSelectTrack(item, videoList)}>
                 {item.snippet.title}
             </p>
              <p className="text-xs text-dark-subtext">

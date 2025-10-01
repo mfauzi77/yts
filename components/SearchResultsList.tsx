@@ -41,7 +41,7 @@ const SearchResultItem: React.FC<{
             </button>
         </div>
         <div className="min-w-0">
-            <p className={`text-sm font-semibold truncate ${isPlaying ? 'text-brand-red' : 'text-white'}`}>
+            <p className={`text-sm font-semibold ${isPlaying ? 'text-brand-red' : 'text-white'} [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden`}>
                 {item.snippet.title}
             </p>
             <p 

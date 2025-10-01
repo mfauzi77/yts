@@ -37,7 +37,7 @@ const HistoryItem: React.FC<{
             </button>
         </div>
         <div className="min-w-0">
-            <p className={`text-sm font-semibold truncate cursor-pointer ${isPlaying ? 'text-brand-red' : 'text-white'}`} onClick={() => onSelectTrack(item, history)}>
+            <p className={`text-sm font-semibold cursor-pointer ${isPlaying ? 'text-brand-red' : 'text-white'} [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden`} onClick={() => onSelectTrack(item, history)}>
                 {item.snippet.title}
             </p>
             <p 

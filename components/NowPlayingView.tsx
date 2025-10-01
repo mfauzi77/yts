@@ -91,7 +91,7 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
                     
                 {/* Controls */}
                 <div className="w-full max-w-md text-center">
-                    <h1 className="text-lg md:text-2xl font-bold">{track.snippet.title}</h1>
+                    <h1 className="text-lg md:text-2xl font-bold [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3] overflow-hidden">{track.snippet.title}</h1>
                     <p className="text-sm text-white/70 mt-1">{track.snippet.channelTitle}</p>
 
                     <div className="space-y-1 my-3 md:my-6">

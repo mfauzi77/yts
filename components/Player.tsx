@@ -66,7 +66,7 @@ export const Player: React.FC<PlayerProps> = ({
                         onClick={onToggleNowPlaying}
                     />
                     <div className="min-w-0">
-                        <p className="font-semibold text-sm truncate cursor-pointer text-white" onClick={onToggleNowPlaying}>{track.snippet.title}</p>
+                        <p className="font-semibold text-sm cursor-pointer text-white [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden" onClick={onToggleNowPlaying}>{track.snippet.title}</p>
                         <p className="text-xs text-dark-subtext truncate cursor-pointer hover:underline" onClick={handleChannelClick}>
                             {track.snippet.channelTitle}
                         </p>
@@ -90,7 +90,7 @@ export const Player: React.FC<PlayerProps> = ({
                         onClick={onToggleNowPlaying}
                     />
                     <div>
-                        <p className="font-semibold text-sm truncate cursor-pointer hover:underline" onClick={onToggleNowPlaying}>{track.snippet.title}</p>
+                        <p className="font-semibold text-sm cursor-pointer hover:underline [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden" onClick={onToggleNowPlaying}>{track.snippet.title}</p>
                         <p className="text-xs text-dark-subtext cursor-pointer hover:underline" onClick={handleChannelClick}>
                             {track.snippet.channelTitle}
                         </p>
