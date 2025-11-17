@@ -24,7 +24,8 @@ const SearchResultItem: React.FC<{
     isOffline: boolean;
     onAddToOffline: (track: VideoItem) => void;
     isPlaying: boolean;
-}> = ({ item, onSelectTrack, onAddToPlaylist, onSelectChannel, isInPlaylist, isOffline, onAddToOffline, isPlaying }) => (
+    contextList: VideoItem[];
+}> = ({ item, onSelectTrack, onAddToPlaylist, onSelectChannel, isInPlaylist, isOffline, onAddToOffline, isPlaying, contextList }) => (
     <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
         <div className="relative w-12 h-12">
             <img
@@ -33,7 +34,7 @@ const SearchResultItem: React.FC<{
                 className="w-full h-full rounded-md object-cover"
             />
              <button
-                onClick={() => onSelectTrack(item, [])}
+                onClick={() => onSelectTrack(item, contextList)}
                 className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-md"
                 aria-label={`Putar ${item.snippet.title}`}
             >
@@ -41,7 +42,9 @@ const SearchResultItem: React.FC<{
             </button>
         </div>
         <div className="min-w-0">
-            <p className={`text-sm font-semibold ${isPlaying ? 'text-brand-red' : 'text-white'} [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden`}>
+            <p 
+                onClick={() => onSelectTrack(item, contextList)}
+                className={`text-sm font-semibold cursor-pointer ${isPlaying ? 'text-brand-red' : 'text-white'} [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden`}>
                 {item.snippet.title}
             </p>
             <p 
@@ -128,6 +131,7 @@ export const SearchResultList: React.FC<SearchResultListProps> = ({ results, isL
                 isOffline={offlineItems.some(o => o.id.videoId === item.id.videoId)}
                 onAddToOffline={onAddToOffline}
                 isPlaying={currentTrackId === item.id.videoId}
+                contextList={results}
             />
         )
       )}

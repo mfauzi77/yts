@@ -15,6 +15,8 @@ interface PlayerProps {
   duration: number;
   seekTo: (seconds: number) => void;
   onToggleMiniPlayer: () => void;
+  isAutoplayEnabled: boolean;
+  onToggleAutoplay: () => void;
 }
 
 const formatTime = (seconds: number) => {
@@ -28,6 +30,7 @@ const formatTime = (seconds: number) => {
 export const Player: React.FC<PlayerProps> = ({
     track, isPlaying, setIsPlaying, onNext, onPrev, onToggleNowPlaying,
     onSelectChannel, volume, setVolume, currentTime, duration, seekTo, onToggleMiniPlayer,
+    isAutoplayEnabled, onToggleAutoplay
 }) => {
     
     useEffect(() => {
@@ -126,6 +129,14 @@ export const Player: React.FC<PlayerProps> = ({
 
                 {/* Right: Volume & Options */}
                 <div className="flex items-center space-x-4 justify-end">
+                    <button
+                        onClick={onToggleAutoplay}
+                        title="Alihkan Putar Otomatis"
+                        className={`p-2 rounded-full text-dark-subtext hover:bg-dark-card hover:text-white transition-colors ${isAutoplayEnabled ? 'text-brand-red' : ''}`}
+                        aria-label="Alihkan Putar Otomatis"
+                    >
+                        <i className="fas fa-redo-alt"></i>
+                    </button>
                     <button 
                         onClick={onToggleMiniPlayer} 
                         title="Pemutar mini" 

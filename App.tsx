@@ -184,9 +184,12 @@ const App: React.FC = () => {
         isAttemptingAutoplay.current = true;
         try {
             const relatedVideos = await getRelatedVideos(currentTrack.id.videoId);
-            const nextTrack = relatedVideos.find(video => video.id.videoId !== currentTrack.id.videoId);
-            if (nextTrack) {
-                handleSelectTrack(nextTrack, []);
+            // Filter out the current track to avoid replaying it immediately.
+            const playableRelated = relatedVideos.filter(v => v.id.videoId !== currentTrack.id.videoId);
+
+            if (playableRelated.length > 0) {
+                const nextTrack = playableRelated[0];
+                handleSelectTrack(nextTrack, playableRelated);
             } else {
                 setIsPlaying(false);
             }
@@ -423,6 +426,8 @@ const App: React.FC = () => {
                             seekTo={seekTo}
                             onSelectChannel={handleSelectChannel}
                             onToggleMiniPlayer={() => setIsMiniPlayerActive(p => !p)}
+                            isAutoplayEnabled={isAutoplayEnabled}
+                            onToggleAutoplay={() => setIsAutoplayEnabled(p => !p)}
                         />
                     </footer>
                 )}

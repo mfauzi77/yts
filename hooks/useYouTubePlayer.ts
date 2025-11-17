@@ -30,6 +30,11 @@ export const useYouTubePlayer = ({ videoId, isPlaying, onStateChange }: UseYouTu
     const [currentTime, setCurrentTime] = useState(0);
     const [volume, setVolumeState] = useState(100);
 
+    const onStateChangeRef = useRef(onStateChange);
+    useEffect(() => {
+        onStateChangeRef.current = onStateChange;
+    }, [onStateChange]);
+
     const clearTimeInterval = () => {
         if (intervalRef.current) {
             clearInterval(intervalRef.current);
@@ -53,11 +58,11 @@ export const useYouTubePlayer = ({ videoId, isPlaying, onStateChange }: UseYouTu
                     'onReady': () => {
                         setIsReady(true);
                     },
-                    'onStateChange': onStateChange
+                    'onStateChange': (event) => onStateChangeRef.current?.(event),
                 }
             });
         }
-    }, [onStateChange]);
+    }, []);
 
     useEffect(() => {
         if (!window.YT) {

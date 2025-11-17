@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { VideoItem } from '../types';
 import { AudioVisualizerCanvas } from './AudioVisualizerCanvas';
+import { LyricsView } from './LyricsView';
 
 interface NowPlayingViewProps {
   isOpen: boolean;
@@ -33,8 +34,16 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
     children
 }) => {
     const [showVisualizer, setShowVisualizer] = useState(false);
+    const [viewMode, setViewMode] = useState<'album' | 'lyrics'>('album');
     
     const imageUrl = track.snippet.thumbnails.high?.url || track.snippet.thumbnails.default.url;
+
+    useEffect(() => {
+        if (isOpen) {
+            setViewMode('album');
+        }
+    }, [track.id.videoId, isOpen]);
+
 
     return (
         <div 
@@ -74,19 +83,23 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
                     <i className="fas fa-chevron-down text-lg"></i>
                 </button>
                 
-                {/* Album Art */}
-                <div className="w-10/12 max-w-[240px] md:w-full md:max-w-sm">
-                    <div className="relative w-full aspect-square rounded-lg shadow-2xl overflow-hidden mb-4 md:mb-8">
-                        {showVisualizer ? (
-                            <AudioVisualizerCanvas isPlaying={isPlaying} />
-                        ) : (
-                            <img 
-                                src={imageUrl} 
-                                alt={track.snippet.title} 
-                                className="w-full h-full object-cover"
-                            />
-                        )}
-                    </div>
+                {/* Album Art / Lyrics View */}
+                <div className="w-10/12 max-w-[240px] md:w-full md:max-w-sm aspect-square mb-4 md:mb-8">
+                   {viewMode === 'album' ? (
+                        <div className="relative w-full h-full rounded-lg shadow-2xl overflow-hidden">
+                            {showVisualizer ? (
+                                <AudioVisualizerCanvas isPlaying={isPlaying} />
+                            ) : (
+                                <img 
+                                    src={imageUrl} 
+                                    alt={track.snippet.title} 
+                                    className="w-full h-full object-cover"
+                                />
+                            )}
+                        </div>
+                    ) : (
+                        <LyricsView track={track} />
+                    )}
                 </div>
                     
                 {/* Controls */}
@@ -109,11 +122,12 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
                         </div>
                     </div>
 
-                    <div className="flex justify-center items-center space-x-4 md:space-x-8 my-2 md:my-4">
+                    <div className="flex justify-center items-center space-x-2 md:space-x-4 my-2 md:my-4">
                         <button
                             onClick={() => setShowVisualizer(p => !p)}
                             title="Alihkan Visualizer"
-                            className={`w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-full text-white/80 hover:bg-white/10 ${showVisualizer ? 'text-brand-red' : ''}`}
+                            className={`w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-full text-white/80 hover:bg-white/10 ${showVisualizer && viewMode === 'album' ? 'text-brand-red' : ''} disabled:opacity-50`}
+                            disabled={viewMode === 'lyrics'}
                         >
                             <i className="fas fa-chart-bar text-lg md:text-xl"></i>
                         </button>
@@ -126,7 +140,14 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
                         <button onClick={onNext} className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-full text-white/80 hover:text-white hover:bg-white/10">
                             <i className="fas fa-step-forward text-lg md:text-xl"></i>
                         </button>
-                            <button
+                        <button
+                            onClick={() => setViewMode(p => p === 'lyrics' ? 'album' : 'lyrics')}
+                            title="Alihkan Lirik"
+                            className={`w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-full text-white/80 hover:bg-white/10 ${viewMode === 'lyrics' ? 'text-brand-red' : ''}`}
+                        >
+                            <i className="fas fa-microphone-alt text-lg md:text-xl"></i>
+                        </button>
+                        <button
                             onClick={onToggleAutoplay}
                             title="Alihkan Putar Otomatis"
                             className={`w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-full text-white/80 hover:bg-white/10 ${isAutoplayEnabled ? 'text-brand-red' : ''}`}
