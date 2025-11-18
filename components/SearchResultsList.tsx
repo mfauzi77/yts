@@ -1,3 +1,4 @@
+
 import React from 'react';
 import type { VideoItem } from '../types';
 
@@ -5,9 +6,8 @@ interface SearchResultListProps {
   results: VideoItem[];
   isLoading: boolean;
   onSelectTrack: (track: VideoItem, contextList?: VideoItem[]) => void;
-  onAddToPlaylist: (track: VideoItem) => void;
+  onOpenAddToPlaylistModal: (track: VideoItem) => void;
   onSelectChannel: (channelId: string, channelTitle: string) => void;
-  playlist: VideoItem[];
   viewType: 'search' | 'recommendations';
   onGenerateDiscoveryMix: () => void;
   offlineItems: VideoItem[];
@@ -18,14 +18,13 @@ interface SearchResultListProps {
 const SearchResultItem: React.FC<{
     item: VideoItem;
     onSelectTrack: (track: VideoItem, contextList?: VideoItem[]) => void;
-    onAddToPlaylist: (track: VideoItem) => void;
+    onOpenAddToPlaylistModal: (track: VideoItem) => void;
     onSelectChannel: (channelId: string, channelTitle: string) => void;
-    isInPlaylist: boolean;
     isOffline: boolean;
     onAddToOffline: (track: VideoItem) => void;
     isPlaying: boolean;
     contextList: VideoItem[];
-}> = ({ item, onSelectTrack, onAddToPlaylist, onSelectChannel, isInPlaylist, isOffline, onAddToOffline, isPlaying, contextList }) => (
+}> = ({ item, onSelectTrack, onOpenAddToPlaylistModal, onSelectChannel, isOffline, onAddToOffline, isPlaying, contextList }) => (
     <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
         <div className="relative w-12 h-12">
             <img
@@ -66,21 +65,18 @@ const SearchResultItem: React.FC<{
                 <i className={`fas ${isOffline ? 'fa-check-circle' : 'fa-cloud-download-alt'}`}></i>
             </button>
             <button
-                onClick={() => onAddToPlaylist(item)}
-                disabled={isInPlaylist}
-                className={`p-2 w-10 rounded-full transition-colors duration-200 ${
-                    isInPlaylist ? 'text-green-500' : 'text-dark-subtext hover:text-white'
-                }`}
-                title={isInPlaylist ? "Ditambahkan ke playlist" : "Tambahkan ke playlist"}
+                onClick={() => onOpenAddToPlaylistModal(item)}
+                className="p-2 w-10 rounded-full text-dark-subtext hover:text-white transition-colors duration-200"
+                title="Tambahkan ke playlist"
             >
-                <i className={`fas ${isInPlaylist ? 'fa-check' : 'fa-plus'}`}></i>
+                <i className="fas fa-plus"></i>
             </button>
         </div>
     </div>
 );
 
 
-export const SearchResultList: React.FC<SearchResultListProps> = ({ results, isLoading, onSelectTrack, onAddToPlaylist, onSelectChannel, playlist, viewType, onGenerateDiscoveryMix, offlineItems, onAddToOffline, currentTrackId }) => {
+export const SearchResultList: React.FC<SearchResultListProps> = ({ results, isLoading, onSelectTrack, onOpenAddToPlaylistModal, onSelectChannel, viewType, onGenerateDiscoveryMix, offlineItems, onAddToOffline, currentTrackId }) => {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -125,9 +121,8 @@ export const SearchResultList: React.FC<SearchResultListProps> = ({ results, isL
                 key={item.id.videoId}
                 item={item}
                 onSelectTrack={onSelectTrack}
-                onAddToPlaylist={onAddToPlaylist}
+                onOpenAddToPlaylistModal={onOpenAddToPlaylistModal}
                 onSelectChannel={onSelectChannel}
-                isInPlaylist={playlist.some(p => p.id.videoId === item.id.videoId)}
                 isOffline={offlineItems.some(o => o.id.videoId === item.id.videoId)}
                 onAddToOffline={onAddToOffline}
                 isPlaying={currentTrackId === item.id.videoId}

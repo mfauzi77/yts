@@ -1,14 +1,27 @@
+
 import React from 'react';
 import type { VideoItem } from '../types';
 
 interface OfflineListProps {
   offlinePlaylist: VideoItem[];
+  syncedOfflineIds: string[];
   onSelectTrack: (track: VideoItem, contextList: VideoItem[]) => void;
   onRemoveFromOfflinePlaylist: (trackId: string) => void;
   onSelectChannel: (channelId: string, channelTitle: string) => void;
   currentTrackId?: string | null;
+  isSyncing: boolean;
+  onStartSync: () => void;
 }
 
+const StatusIcon: React.FC<{ isSynced: boolean; isPlaying: boolean; isSyncing: boolean; }> = ({ isSynced, isPlaying, isSyncing }) => {
+    if (isPlaying && isSyncing) {
+        return <i className="fas fa-spinner fa-spin text-blue-400" title="Menyinkronkan..."></i>;
+    }
+    if (isSynced) {
+        return <i className="fas fa-check-circle text-green-500" title="Tersedia offline"></i>;
+    }
+    return <i className="fas fa-cloud text-dark-subtext" title="Menunggu sinkronisasi"></i>;
+};
 
 const OfflineItem: React.FC<{
     item: VideoItem;
@@ -17,8 +30,10 @@ const OfflineItem: React.FC<{
     onRemoveFromOfflinePlaylist: (trackId: string) => void;
     onSelectChannel: (channelId: string, channelTitle: string) => void;
     isPlaying: boolean;
+    isSynced: boolean;
+    isSyncing: boolean;
     offlinePlaylist: VideoItem[];
-}> = ({ item, index, onSelectTrack, onRemoveFromOfflinePlaylist, onSelectChannel, isPlaying, offlinePlaylist }) => (
+}> = ({ item, index, onSelectTrack, onRemoveFromOfflinePlaylist, onSelectChannel, isPlaying, isSynced, isSyncing, offlinePlaylist }) => (
     <div className="grid grid-cols-[20px_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
         <div className="flex items-center justify-center text-dark-subtext">
             <span className="group-hover:hidden">{index + 1}</span>
@@ -44,8 +59,15 @@ const OfflineItem: React.FC<{
                 </p>
             </div>
         </div>
-        <div className="flex items-center space-x-1 flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-            <button onClick={() => onRemoveFromOfflinePlaylist(item.id.videoId)} className="p-2 w-10 rounded-full text-dark-subtext hover:text-white" title="Hapus dari Offline">
+        <div className="flex items-center space-x-2 flex-shrink-0">
+            <div className="w-6 text-center">
+                <StatusIcon isSynced={isSynced} isPlaying={isPlaying} isSyncing={isSyncing} />
+            </div>
+            <button 
+                onClick={() => onRemoveFromOfflinePlaylist(item.id.videoId)} 
+                className="p-2 w-10 rounded-full text-dark-subtext hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Hapus dari Offline"
+            >
                 <i className="fas fa-trash-alt"></i>
             </button>
         </div>
@@ -53,7 +75,19 @@ const OfflineItem: React.FC<{
 );
 
 
-export const OfflineList: React.FC<OfflineListProps> = ({ offlinePlaylist, onSelectTrack, onRemoveFromOfflinePlaylist, onSelectChannel, currentTrackId }) => {
+export const OfflineList: React.FC<OfflineListProps> = ({ 
+    offlinePlaylist, 
+    syncedOfflineIds,
+    onSelectTrack, 
+    onRemoveFromOfflinePlaylist, 
+    onSelectChannel, 
+    currentTrackId,
+    isSyncing,
+    onStartSync
+}) => {
+  
+  const unsyncedCount = offlinePlaylist.filter(item => !syncedOfflineIds.includes(item.id.videoId)).length;
+  
   if (offlinePlaylist.length === 0) {
     return (
       <div className="text-center py-10 text-dark-subtext">
@@ -65,19 +99,54 @@ export const OfflineList: React.FC<OfflineListProps> = ({ offlinePlaylist, onSel
   }
 
   return (
-    <div className="space-y-1">
-        {offlinePlaylist.map((item, index) => (
-            <OfflineItem 
-                key={item.id.videoId} 
-                item={item}
-                index={index}
-                onSelectTrack={onSelectTrack}
-                onRemoveFromOfflinePlaylist={onRemoveFromOfflinePlaylist}
-                onSelectChannel={onSelectChannel}
-                isPlaying={currentTrackId === item.id.videoId}
-                offlinePlaylist={offlinePlaylist}
-            />
-        ))}
+    <div>
+        <div className="mb-6 p-4 bg-dark-card rounded-lg">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                    <h2 className="text-lg font-bold">Sinkronisasi Offline</h2>
+                    <p className="text-sm text-dark-subtext">
+                        {isSyncing ? "Proses sinkronisasi sedang berjalan..." : `${unsyncedCount} dari ${offlinePlaylist.length} lagu perlu disinkronkan.`}
+                    </p>
+                </div>
+                <button
+                    onClick={onStartSync}
+                    disabled={isSyncing || unsyncedCount === 0}
+                    className="px-5 py-2.5 bg-brand-red text-white font-semibold rounded-full hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-brand-red/50 transition-all duration-200 ease-in-out shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-md disabled:bg-dark-surface"
+                >
+                    {isSyncing ? (
+                        <>
+                            <i className="fas fa-spinner fa-spin mr-2"></i>
+                            Menyinkronkan...
+                        </>
+                    ) : (
+                       <>
+                            <i className="fas fa-sync-alt mr-2"></i>
+                            Sinkronkan Semua
+                       </>
+                    )}
+                </button>
+            </div>
+             <p className="text-xs text-dark-subtext mt-3 pt-3 border-t border-dark-surface/50">
+                Fitur ini akan memutar lagu Anda satu per satu untuk menyimpannya di perangkat Anda untuk pemutaran offline. Pastikan koneksi internet Anda stabil.
+            </p>
+        </div>
+
+        <div className="space-y-1">
+            {offlinePlaylist.map((item, index) => (
+                <OfflineItem 
+                    key={item.id.videoId} 
+                    item={item}
+                    index={index}
+                    onSelectTrack={onSelectTrack}
+                    onRemoveFromOfflinePlaylist={onRemoveFromOfflinePlaylist}
+                    onSelectChannel={onSelectChannel}
+                    isPlaying={currentTrackId === item.id.videoId}
+                    isSynced={syncedOfflineIds.includes(item.id.videoId)}
+                    isSyncing={isSyncing}
+                    offlinePlaylist={offlinePlaylist}
+                />
+            ))}
+        </div>
     </div>
   );
 };

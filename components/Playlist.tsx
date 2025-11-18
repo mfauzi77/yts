@@ -1,114 +1,94 @@
-import React from 'react';
-import type { VideoItem } from '../types';
 
-interface PlaylistProps {
-  playlist: VideoItem[];
-  onSelectTrack: (track: VideoItem, contextList: VideoItem[]) => void;
-  onRemoveFromPlaylist: (trackId: string) => void;
-  onSelectChannel: (channelId: string, channelTitle: string) => void;
-  currentTrackId?: string | null;
-  isAutoplayEnabled: boolean;
-  onToggleAutoplay: () => void;
-  offlineItems: VideoItem[];
-  onAddToOffline: (track: VideoItem) => void;
+import React from 'react';
+import type { Playlist, VideoItem } from '../types';
+
+interface PlaylistListProps {
+  playlists: Playlist[];
+  onSelectPlaylist: (playlist: Playlist) => void;
+  onCreatePlaylist: (name: string) => void;
 }
 
-const PlaylistItem: React.FC<{
-    item: VideoItem;
-    index: number;
-    onSelectTrack: (track: VideoItem, contextList: VideoItem[]) => void;
-    onRemoveFromPlaylist: (trackId: string) => void;
-    onSelectChannel: (channelId: string, channelTitle: string) => void;
-    isPlaying: boolean;
-    isOffline: boolean;
-    onAddToOffline: (track: VideoItem) => void;
-    playlist: VideoItem[];
-}> = ({ item, index, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, isPlaying, isOffline, onAddToOffline, playlist }) => (
-    <div className="grid grid-cols-[20px_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
-        <div className="flex items-center justify-center text-dark-subtext">
-            <span className="group-hover:hidden">{index + 1}</span>
-            <button onClick={() => onSelectTrack(item, playlist)} className="hidden group-hover:block" aria-label={`Putar ${item.snippet.title}`}>
-                <i className="fas fa-play text-white"></i>
-            </button>
-        </div>
-        <div className="flex items-center gap-4">
-             <img
-                src={item.snippet.thumbnails.default.url}
-                alt={item.snippet.title}
-                className="w-10 h-10 rounded-md object-cover"
-            />
-            <div className="min-w-0">
-                <p className={`text-sm font-semibold cursor-pointer ${isPlaying ? 'text-brand-red' : 'text-white'} [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden`} onClick={() => onSelectTrack(item, playlist)}>
-                    {item.snippet.title}
-                </p>
-                <p 
-                    className="text-xs text-dark-subtext cursor-pointer hover:underline"
-                    onClick={() => onSelectChannel(item.snippet.channelId, item.snippet.channelTitle)}
-                >
-                    {item.snippet.channelTitle}
-                </p>
+const PlaylistCard: React.FC<{
+    playlist: Playlist;
+    onSelect: () => void;
+}> = ({ playlist, onSelect }) => (
+    <div 
+        className="relative group aspect-square rounded-lg overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-shadow duration-300"
+        onClick={onSelect}
+    >
+        {playlist.tracks.length > 0 ? (
+            <div className="grid grid-cols-2 grid-rows-2 w-full h-full">
+                {playlist.tracks.slice(0, 4).map((track, index) => (
+                    <img 
+                        key={track.id.videoId + index}
+                        src={track.snippet.thumbnails.medium?.url || track.snippet.thumbnails.default.url}
+                        alt=""
+                        className="w-full h-full object-cover"
+                    />
+                ))}
+                {/* Fill empty grid cells if less than 4 tracks */}
+                {Array(Math.max(0, 4 - playlist.tracks.length)).fill(0).map((_, i) => (
+                    <div key={i} className="bg-dark-card"></div>
+                ))}
             </div>
+        ) : (
+            <div className="w-full h-full bg-dark-card flex items-center justify-center">
+                <i className="fas fa-music text-5xl text-dark-surface"></i>
+            </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+        <div className="absolute bottom-0 left-0 p-3 md:p-4 text-white">
+            <h3 className="font-bold text-lg md:text-xl [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden">{playlist.name}</h3>
+            <p className="text-xs md:text-sm text-dark-subtext mt-1">{playlist.tracks.length} lagu</p>
         </div>
-        <div className="flex items-center space-x-1 flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-             <button
-                onClick={() => onAddToOffline(item)}
-                disabled={isOffline}
-                className={`p-2 w-10 rounded-full transition-colors duration-200 ${
-                    isOffline ? 'text-green-500' : 'text-dark-subtext hover:text-white'
-                }`}
-                title={isOffline ? "Disimpan offline" : "Simpan untuk offline"}
-            >
-                <i className={`fas ${isOffline ? 'fa-check-circle' : 'fa-cloud-download-alt'}`}></i>
-            </button>
-            <button onClick={() => onRemoveFromPlaylist(item.id.videoId)} className="p-2 w-10 rounded-full text-dark-subtext hover:text-white" title="Hapus dari playlist">
-                <i className="fas fa-trash-alt"></i>
-            </button>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-brand-red/80 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 group-hover:scale-110 transition-all duration-300">
+            <i className="fas fa-play text-white text-2xl ml-1"></i>
         </div>
     </div>
 );
 
-
-export const Playlist: React.FC<PlaylistProps> = ({ playlist, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, currentTrackId, isAutoplayEnabled, onToggleAutoplay, offlineItems, onAddToOffline }) => {
-  if (playlist.length === 0) {
-    return (
-      <div className="text-center py-10 text-dark-subtext">
-        <i className="fas fa-list-ul text-4xl mb-4"></i>
-        <p>Playlist Anda kosong.</p>
-        <p className="text-sm">Tambahkan lagu dari hasil pencarian untuk memulai.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-        <div className="flex items-center justify-end mb-4 pr-2">
-            <div className="flex items-center">
-                <span className="mr-3 text-sm font-medium text-dark-subtext">Putar Otomatis</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" checked={isAutoplayEnabled} onChange={onToggleAutoplay} className="sr-only peer" />
-                    <div className="w-11 h-6 bg-dark-card peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-brand-red"></div>
-                </label>
-            </div>
-        </div>
-        <div className="space-y-1">
-          {playlist.map((item, index) => {
-            const isOffline = offlineItems.some(o => o.id.videoId === item.id.videoId);
-            return (
-                <PlaylistItem 
-                    key={item.id.videoId} 
-                    item={item}
-                    index={index}
-                    onSelectTrack={onSelectTrack}
-                    onRemoveFromPlaylist={onRemoveFromPlaylist}
-                    onSelectChannel={onSelectChannel}
-                    isPlaying={currentTrackId === item.id.videoId}
-                    isOffline={isOffline}
-                    onAddToOffline={onAddToOffline}
-                    playlist={playlist}
-                />
-            )
-          })}
-        </div>
+const CreatePlaylistCard: React.FC<{ onClick: () => void }> = ({ onClick }) => (
+    <div 
+        className="flex flex-col items-center justify-center aspect-square rounded-lg border-2 border-dashed border-dark-card hover:border-dark-subtext text-dark-subtext hover:text-white transition-colors duration-300 cursor-pointer"
+        onClick={onClick}
+    >
+        <i className="fas fa-plus text-4xl"></i>
+        <p className="mt-4 font-semibold">Buat Playlist Baru</p>
     </div>
-  );
+);
+
+
+export const PlaylistListView: React.FC<PlaylistListProps> = ({ playlists, onSelectPlaylist, onCreatePlaylist }) => {
+    
+    const handleCreateClick = () => {
+        const name = prompt("Masukkan nama playlist baru:");
+        if (name && name.trim()) {
+            onCreatePlaylist(name.trim());
+        }
+    };
+    
+    if (playlists.length === 0) {
+        return (
+            <div className="text-center py-10">
+                <CreatePlaylistCard onClick={handleCreateClick} />
+                <div className="mt-8 text-dark-subtext">
+                    <p>Anda belum memiliki playlist.</p>
+                    <p className="text-sm">Klik di atas untuk membuat yang pertama!</p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
+            <CreatePlaylistCard onClick={handleCreateClick} />
+            {playlists.map(p => (
+                <PlaylistCard 
+                    key={p.id} 
+                    playlist={p} 
+                    onSelect={() => onSelectPlaylist(p)} 
+                />
+            ))}
+        </div>
+    );
 };

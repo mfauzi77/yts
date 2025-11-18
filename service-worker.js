@@ -55,7 +55,32 @@ self.addEventListener('fetch', event => {
 
   const url = new URL(event.request.url);
 
-  // Strategy 1: YouTube API Data (Stale-While-Revalidate)
+  // Strategy: Media Streams from YouTube (Cache First)
+  // This is crucial for offline playback.
+  if (url.hostname.endsWith('googlevideo.com')) {
+    event.respondWith(
+        caches.open(DATA_CACHE_NAME).then(cache => {
+            return cache.match(event.request).then(cachedResponse => {
+                // If we have a cached response (including partial content), return it.
+                if (cachedResponse) {
+                    return cachedResponse;
+                }
+                
+                // Otherwise, fetch from the network.
+                return fetch(event.request).then(networkResponse => {
+                    // Cache the response if it's valid (200 OK or 206 Partial Content).
+                    if (networkResponse && (networkResponse.status === 200 || networkResponse.status === 206)) {
+                        cache.put(event.request, networkResponse.clone());
+                    }
+                    return networkResponse;
+                });
+            });
+        })
+    );
+    return;
+  }
+  
+  // Strategy: YouTube API Data (Stale-While-Revalidate)
   // Serve from cache immediately, then update in the background. Good for data that changes.
   if (url.hostname === 'www.googleapis.com' && url.pathname.startsWith('/youtube/v3')) {
       event.respondWith(
@@ -80,7 +105,7 @@ self.addEventListener('fetch', event => {
       return;
   }
 
-  // Strategy 2: Images & Fonts (Cache First)
+  // Strategy: Images & Fonts (Cache First)
   // Serve from cache. If not in cache, fetch from network and then cache it. Good for static assets.
   if (url.hostname === 'i.ytimg.com' || url.hostname === 'ka-f.fontawesome.com') {
       event.respondWith(
@@ -98,7 +123,7 @@ self.addEventListener('fetch', event => {
       return;
   }
 
-  // Strategy 3: App Shell & Other Static Assets (Cache First)
+  // Strategy: App Shell & Other Static Assets (Cache First)
   // Default strategy for all other GET requests.
   event.respondWith(
     caches.match(event.request)

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import type { VideoItem } from '../types';
 
@@ -8,9 +9,8 @@ interface ChannelViewProps {
   isMoreLoading: boolean;
   onSelectTrack: (track: VideoItem, contextList: VideoItem[]) => void;
   onBack: () => void;
-  onAddToPlaylist: (track: VideoItem) => void;
+  onOpenAddToPlaylistModal: (track: VideoItem) => void;
   onAddToOffline: (track: VideoItem) => void;
-  playlist: VideoItem[];
   offlineItems: VideoItem[];
   currentTrackId?: string | null;
   onLoadMore: () => void;
@@ -20,13 +20,12 @@ interface ChannelViewProps {
 const ChannelVideoItem: React.FC<{
     item: VideoItem;
     onSelectTrack: (track: VideoItem, contextList: VideoItem[]) => void;
-    onAddToPlaylist: (track: VideoItem) => void;
-    isInPlaylist: boolean;
+    onOpenAddToPlaylistModal: (track: VideoItem) => void;
     isOffline: boolean;
     onAddToOffline: (track: VideoItem) => void;
     isPlaying: boolean;
     videoList: VideoItem[];
-}> = ({ item, onSelectTrack, onAddToPlaylist, isInPlaylist, isOffline, onAddToOffline, isPlaying, videoList }) => (
+}> = ({ item, onSelectTrack, onOpenAddToPlaylistModal, isOffline, onAddToOffline, isPlaying, videoList }) => (
     <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
         <div className="relative w-12 h-12">
             <img
@@ -62,14 +61,11 @@ const ChannelVideoItem: React.FC<{
                 <i className={`fas ${isOffline ? 'fa-check-circle' : 'fa-cloud-download-alt'}`}></i>
             </button>
             <button
-                onClick={() => onAddToPlaylist(item)}
-                disabled={isInPlaylist}
-                className={`p-2 w-10 rounded-full transition-colors duration-200 ${
-                    isInPlaylist ? 'text-green-500' : 'text-dark-subtext hover:text-white'
-                }`}
-                title={isInPlaylist ? "Ditambahkan ke playlist" : "Tambahkan ke playlist"}
+                onClick={() => onOpenAddToPlaylistModal(item)}
+                className="p-2 w-10 rounded-full text-dark-subtext hover:text-white transition-colors duration-200"
+                title="Tambahkan ke playlist"
             >
-                <i className={`fas ${isInPlaylist ? 'fa-check' : 'fa-plus'}`}></i>
+                <i className="fas fa-plus"></i>
             </button>
         </div>
     </div>
@@ -82,9 +78,8 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
     isMoreLoading,
     onSelectTrack, 
     onBack,
-    onAddToPlaylist,
+    onOpenAddToPlaylistModal,
     onAddToOffline,
-    playlist,
     offlineItems,
     currentTrackId,
     onLoadMore,
@@ -112,8 +107,7 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                             key={item.id.videoId}
                             item={item}
                             onSelectTrack={onSelectTrack}
-                            onAddToPlaylist={onAddToPlaylist}
-                            isInPlaylist={playlist.some(p => p.id.videoId === item.id.videoId)}
+                            onOpenAddToPlaylistModal={onOpenAddToPlaylistModal}
                             isOffline={offlineItems.some(o => o.id.videoId === item.id.videoId)}
                             onAddToOffline={onAddToOffline}
                             isPlaying={currentTrackId === item.id.videoId}

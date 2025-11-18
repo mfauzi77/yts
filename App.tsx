@@ -1,12 +1,13 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { SearchBar } from './components/SearchBar';
 import { Player } from './components/Player';
 import { SearchResultList } from './components/SearchResultsList';
-import { Playlist } from './components/Playlist';
+import { PlaylistListView } from './components/Playlist';
 import { HistoryList } from './components/HistoryList';
 import { searchVideos, getChannelVideos, getRelatedVideos } from './services/youtubeService';
 import { useLocalStorage } from './hooks/useLocalStorage';
-import type { VideoItem } from './types';
+import type { VideoItem, Playlist } from './types';
 import { useYouTubePlayer } from './hooks/useYouTubePlayer';
 import { NowPlayingView } from './components/NowPlayingView';
 import { ChannelView } from './components/ChannelView';
@@ -18,8 +19,10 @@ import { Sidebar } from './components/Sidebar';
 import { BottomNavBar } from './components/BottomNavBar';
 import { ErrorDisplay } from './components/ErrorDisplay';
 import { AutoplayOverlay } from './components/AutoplayOverlay';
+import { AddToPlaylistModal } from './components/AddToPlaylistModal';
+import { PlaylistDetailView } from './components/PlaylistDetailView';
 
-type MainView = 'home' | 'playlist' | 'history' | 'offline' | 'channel';
+type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'offline' | 'channel';
 type ApiStatus = 'idle' | 'success' | 'error';
 
 const App: React.FC = () => {
@@ -45,14 +48,44 @@ const App: React.FC = () => {
     const [isLandingPageMounted, setIsLandingPageMounted] = useState<boolean>(true);
     const [isAutoplayBlocked, setIsAutoplayBlocked] = useState<boolean>(false);
 
-    const [playlist, setPlaylist] = useLocalStorage<VideoItem[]>('ytas-playlist', []);
+    const [playlists, setPlaylists] = useLocalStorage<Playlist[]>('ytas-playlists', []);
     const [history, setHistory] = useLocalStorage<VideoItem[]>('ytas-history', []);
     const [offlineItems, setOfflineItems] = useLocalStorage<VideoItem[]>('ytas-offline', []);
+    const [syncedOfflineIds, setSyncedOfflineIds] = useLocalStorage<string[]>('ytas-synced-ids', []);
     const [isAutoplayEnabled, setIsAutoplayEnabled] = useLocalStorage<boolean>('ytas-autoplay', true);
+    
+    const [activePlaylist, setActivePlaylist] = useState<Playlist | null>(null);
+    const [modalTrack, setModalTrack] = useState<VideoItem | null>(null);
 
     const [activePlaybackList, setActivePlaybackList] = useState<VideoItem[]>([]);
     const currentTrackIndexRef = React.useRef(-1);
     const isAttemptingAutoplay = useRef(false);
+    
+    const [isSyncing, setIsSyncing] = useState(false);
+    const isSyncingRef = useRef(false);
+    const syncQueueRef = useRef<VideoItem[]>([]);
+
+
+    useEffect(() => {
+        const oldPlaylistJson = localStorage.getItem('ytas-playlist');
+        if (oldPlaylistJson) {
+            try {
+                const oldPlaylistTracks: VideoItem[] = JSON.parse(oldPlaylistJson);
+                if (Array.isArray(oldPlaylistTracks) && oldPlaylistTracks.length > 0) {
+                    const newPlaylist: Playlist = {
+                        id: `migrated-${Date.now()}`,
+                        name: 'My Old Playlist',
+                        tracks: oldPlaylistTracks
+                    };
+                    setPlaylists(prev => [newPlaylist, ...prev]);
+                }
+            } catch (e) {
+                console.error("Failed to migrate old playlist:", e);
+            } finally {
+                localStorage.removeItem('ytas-playlist');
+            }
+        }
+    }, [setPlaylists]);
 
     const handleApiError = (err: unknown) => {
         const message = err instanceof Error ? err.message : 'Terjadi galat yang tidak diketahui.';
@@ -97,7 +130,7 @@ const App: React.FC = () => {
     
         try {
             const historySeeds = history.slice(0, 3);
-            const playlistSeeds = [...playlist].sort(() => 0.5 - Math.random()).slice(0, 2);
+            const playlistSeeds = playlists.flatMap(p => p.tracks).sort(() => 0.5 - Math.random()).slice(0, 2);
             const seedTracks = [...new Map([...historySeeds, ...playlistSeeds].map(item => [item.id.videoId, item])).values()];
     
             if (seedTracks.length === 0) {
@@ -122,7 +155,7 @@ const App: React.FC = () => {
         } finally {
             setIsRecommendationsLoading(false);
         }
-    }, [history, playlist]);
+    }, [history, playlists]);
 
     const handleSearch = useCallback(async (query: string) => {
         if (!query.trim()) {
@@ -156,14 +189,18 @@ const App: React.FC = () => {
         setIsPlaying(true);
         setIsAutoplayBlocked(false);
         addToHistory(track);
+
+        if (offlineItems.some(i => i.id.videoId === track.id.videoId)) {
+            setSyncedOfflineIds(prev => [...new Set([...prev, track.id.videoId])]);
+        }
+
         setActivePlaybackList(contextList);
         currentTrackIndexRef.current = contextList.findIndex(item => item.id.videoId === track.id.videoId);
         
-        // Automatically open Now Playing view on mobile
-        if (window.innerWidth < 768) { // Corresponds to Tailwind's `md` breakpoint
+        if (window.innerWidth < 768) {
             setIsNowPlayingViewOpen(true);
         }
-    }, [addToHistory]);
+    }, [addToHistory, offlineItems, setSyncedOfflineIds]);
     
     const playNext = useCallback(() => {
         if (activePlaybackList.length === 0) return;
@@ -184,7 +221,6 @@ const App: React.FC = () => {
         isAttemptingAutoplay.current = true;
         try {
             const relatedVideos = await getRelatedVideos(currentTrack.id.videoId);
-            // Filter out the current track to avoid replaying it immediately.
             const playableRelated = relatedVideos.filter(v => v.id.videoId !== currentTrack.id.videoId);
 
             if (playableRelated.length > 0) {
@@ -201,27 +237,35 @@ const App: React.FC = () => {
     }, [currentTrack, handleSelectTrack]);
     
     const handlePlayerStateChange = useCallback((event: { data: number }) => {
-        // Player state codes: -1 (unstarted), 0 (ended), 1 (playing), 2 (paused), 3 (buffering), 5 (video cued)
         if (isAttemptingAutoplay.current && (event.data === 2 || event.data === 5)) {
-             // Autoplay was blocked by the browser
             setIsAutoplayBlocked(true);
-            setIsPlaying(false); // Correct the state
+            setIsPlaying(false);
             isAttemptingAutoplay.current = false;
-        } else if (event.data === 1) { // Playing
+        } else if (event.data === 1) { // playing
             setIsPlaying(true);
             setIsAutoplayBlocked(false);
             isAttemptingAutoplay.current = false;
-        } else if (event.data === 2) { // Paused
+        } else if (event.data === 2) { // paused
             setIsPlaying(false);
             isAttemptingAutoplay.current = false;
-        } else if (event.data === 0 && isAutoplayEnabled) { // Ended
-            if (currentTrackIndexRef.current !== -1 && activePlaybackList.length > 0) {
-                playNext();
-            } else {
-                playRelatedVideo();
+        } else if (event.data === 0) { // ended
+            if (isSyncingRef.current && syncQueueRef.current.length > 0) {
+                const nextTrack = syncQueueRef.current[0];
+                syncQueueRef.current = syncQueueRef.current.slice(1);
+                handleSelectTrack(nextTrack, [nextTrack, ...syncQueueRef.current]);
+            } else if (isSyncingRef.current) {
+                isSyncingRef.current = false;
+                setIsSyncing(false);
+                setIsPlaying(false);
+            } else if (isAutoplayEnabled) {
+                if (currentTrackIndexRef.current !== -1 && activePlaybackList.length > 0) {
+                    playNext();
+                } else {
+                    playRelatedVideo();
+                }
             }
         }
-    }, [playNext, isAutoplayEnabled, activePlaybackList.length, playRelatedVideo]);
+    }, [playNext, isAutoplayEnabled, activePlaybackList.length, playRelatedVideo, handleSelectTrack]);
     
     const { volume, setVolume, seekTo, currentTime, duration } = useYouTubePlayer({
         videoId: currentTrack?.id.videoId ?? null,
@@ -229,13 +273,60 @@ const App: React.FC = () => {
         onStateChange: handlePlayerStateChange,
     });
 
-    const handleAddToPlaylist = useCallback((track: VideoItem) => {
-        setPlaylist(prev => prev.some(item => item.id.videoId === track.id.videoId) ? prev : [...prev, track]);
-    }, [setPlaylist]);
+    const handleOpenAddToPlaylistModal = (track: VideoItem) => setModalTrack(track);
+    const handleCloseAddToPlaylistModal = () => setModalTrack(null);
 
-    const handleRemoveFromPlaylist = useCallback((trackId: string) => {
-        setPlaylist(prev => prev.filter(item => item.id.videoId !== trackId));
-    }, [setPlaylist]);
+    const handleAddTrackToPlaylist = (playlistId: string, track: VideoItem) => {
+        setPlaylists(prev => prev.map(p => {
+            if (p.id === playlistId && !p.tracks.some(t => t.id.videoId === track.id.videoId)) {
+                return { ...p, tracks: [...p.tracks, track] };
+            }
+            return p;
+        }));
+    };
+
+    const handleCreatePlaylistAndAdd = (name: string, track: VideoItem) => {
+        const newPlaylist: Playlist = { id: `playlist-${Date.now()}`, name, tracks: [track] };
+        setPlaylists(prev => [newPlaylist, ...prev]);
+        handleCloseAddToPlaylistModal();
+    };
+    
+    const handleCreatePlaylist = (name: string) => {
+        const newPlaylist: Playlist = { id: `playlist-${Date.now()}`, name, tracks: [] };
+        setPlaylists(prev => [newPlaylist, ...prev]);
+    };
+
+    const handleRemoveTrackFromPlaylist = (playlistId: string, trackId: string) => {
+        setPlaylists(prev => prev.map(p => {
+            if (p.id === playlistId) {
+                return { ...p, tracks: p.tracks.filter(t => t.id.videoId !== trackId) };
+            }
+            return p;
+        }));
+         setActivePlaylist(prev => prev ? {...prev, tracks: prev.tracks.filter(t => t.id.videoId !== trackId)} : null);
+    };
+
+    const handleDeletePlaylist = (playlistId: string) => {
+        if (window.confirm("Are you sure you want to delete this playlist?")) {
+            setPlaylists(prev => prev.filter(p => p.id !== playlistId));
+            handleBackToPlaylists();
+        }
+    };
+    
+    const handleRenamePlaylist = (playlistId: string, newName: string) => {
+        setPlaylists(prev => prev.map(p => p.id === playlistId ? { ...p, name: newName } : p));
+        setActivePlaylist(prev => prev ? {...prev, name: newName} : null);
+    };
+    
+    const handleSelectPlaylist = (playlist: Playlist) => {
+        setActivePlaylist(playlist);
+        setActiveView('playlistDetail');
+    };
+    
+    const handleBackToPlaylists = () => {
+        setActivePlaylist(null);
+        setActiveView('playlists');
+    };
 
     const handleAddToOffline = useCallback((track: VideoItem) => {
         setOfflineItems(prev => {
@@ -247,7 +338,20 @@ const App: React.FC = () => {
 
     const handleRemoveFromOffline = useCallback((trackId: string) => {
         setOfflineItems(prev => prev.filter(item => item.id.videoId !== trackId));
-    }, [setOfflineItems]);
+        setSyncedOfflineIds(prev => prev.filter(id => id !== trackId));
+    }, [setOfflineItems, setSyncedOfflineIds]);
+
+    const handleStartSync = useCallback(() => {
+        const itemsToSync = offlineItems.filter(item => !syncedOfflineIds.includes(item.id.videoId));
+        if (itemsToSync.length === 0 || isSyncingRef.current) return;
+
+        isSyncingRef.current = true;
+        setIsSyncing(true);
+        syncQueueRef.current = itemsToSync.slice(1);
+        
+        handleSelectTrack(itemsToSync[0], itemsToSync);
+
+    }, [offlineItems, syncedOfflineIds, handleSelectTrack]);
 
     const handleSelectChannel = useCallback(async (channelId: string, channelTitle: string) => {
         setIsChannelLoading(true);
@@ -308,32 +412,41 @@ const App: React.FC = () => {
                     results={isShowingSearchResults ? searchResults : recommendations}
                     isLoading={isShowingSearchResults ? isSearchLoading : isRecommendationsLoading}
                     onSelectTrack={handleSelectTrack}
-                    onAddToPlaylist={handleAddToPlaylist}
+                    onOpenAddToPlaylistModal={handleOpenAddToPlaylistModal}
                     onSelectChannel={handleSelectChannel}
-                    playlist={playlist}
                     viewType={isShowingSearchResults ? 'search' : 'recommendations'}
                     onGenerateDiscoveryMix={handleGenerateDiscoveryMix}
                     offlineItems={offlineItems}
                     onAddToOffline={handleAddToOffline}
                     currentTrackId={currentTrack?.id.videoId}
                 />;
-            case 'playlist':
-                return <Playlist
-                    playlist={playlist}
+            case 'playlists':
+                return <PlaylistListView
+                    playlists={playlists}
+                    onSelectPlaylist={handleSelectPlaylist}
+                    onCreatePlaylist={handleCreatePlaylist}
+                />;
+            case 'playlistDetail':
+                 if (!activePlaylist) return null;
+                 return <PlaylistDetailView
+                    playlist={activePlaylist}
                     onSelectTrack={handleSelectTrack}
-                    onRemoveFromPlaylist={handleRemoveFromPlaylist}
+                    onRemoveFromPlaylist={(trackId) => handleRemoveTrackFromPlaylist(activePlaylist.id, trackId)}
                     onSelectChannel={handleSelectChannel}
                     currentTrackId={currentTrack?.id.videoId}
                     isAutoplayEnabled={isAutoplayEnabled}
                     onToggleAutoplay={() => setIsAutoplayEnabled(p => !p)}
                     offlineItems={offlineItems}
                     onAddToOffline={handleAddToOffline}
+                    onBack={handleBackToPlaylists}
+                    onDelete={() => handleDeletePlaylist(activePlaylist.id)}
+                    onRename={(newName) => handleRenamePlaylist(activePlaylist.id, newName)}
                 />;
             case 'history':
                 return <HistoryList
                     history={history}
                     onSelectTrack={handleSelectTrack}
-                    onAddToPlaylist={handleAddToPlaylist}
+                    onOpenAddToPlaylistModal={handleOpenAddToPlaylistModal}
                     onSelectChannel={handleSelectChannel}
                     offlineItems={offlineItems}
                     onAddToOffline={handleAddToOffline}
@@ -342,10 +455,13 @@ const App: React.FC = () => {
             case 'offline':
                  return <OfflineList
                     offlinePlaylist={offlineItems}
+                    syncedOfflineIds={syncedOfflineIds}
                     onSelectTrack={handleSelectTrack}
                     onRemoveFromOfflinePlaylist={handleRemoveFromOffline}
                     onSelectChannel={handleSelectChannel}
                     currentTrackId={currentTrack?.id.videoId}
+                    isSyncing={isSyncing}
+                    onStartSync={handleStartSync}
                 />;
             case 'channel':
                 if (!selectedChannel) return null;
@@ -356,9 +472,8 @@ const App: React.FC = () => {
                     isMoreLoading={isChannelMoreLoading}
                     onSelectTrack={handleSelectTrack}
                     onBack={() => handleBackToTabs()}
-                    onAddToPlaylist={handleAddToPlaylist}
+                    onOpenAddToPlaylistModal={handleOpenAddToPlaylistModal}
                     onAddToOffline={handleAddToOffline}
-                    playlist={playlist}
                     offlineItems={offlineItems}
                     currentTrackId={currentTrack?.id.videoId}
                     onLoadMore={handleLoadMoreChannelVideos}
@@ -370,23 +485,39 @@ const App: React.FC = () => {
 
     const viewTitles: { [key in MainView]?: string } = {
         home: 'Beranda',
-        playlist: 'Playlist',
+        playlists: 'Playlist',
         history: 'Riwayat',
         offline: 'Koleksi Offline',
     };
+    
+    const getCurrentTitle = () => {
+        if (activeView === 'playlistDetail') return activePlaylist?.name || 'Playlist';
+        if (activeView === 'channel') return selectedChannel?.title || 'Channel';
+        return viewTitles[activeView];
+    }
 
     return (
         <>
             {isLandingPageMounted && <LandingPage onEnter={handleEnterApp} isExiting={isAppEntered} />}
+            
+            {modalTrack && (
+                <AddToPlaylistModal
+                    track={modalTrack}
+                    playlists={playlists}
+                    onClose={handleCloseAddToPlaylistModal}
+                    onAddToPlaylist={(playlistId, track) => handleAddTrackToPlaylist(playlistId, track)}
+                    onCreateAndAdd={handleCreatePlaylistAndAdd}
+                />
+            )}
 
             <div className={`grid h-screen font-sans transition-opacity duration-500 ${isAppEntered ? 'opacity-100' : 'opacity-0'} ${currentTrack ? 'grid-rows-[1fr_auto]' : 'grid-rows-1'} grid-cols-1 md:grid-cols-[250px_1fr] bg-dark-bg text-dark-text`}>
                 <Sidebar activeView={activeView} setActiveView={setActiveView} />
 
                 <div className="flex flex-col overflow-hidden bg-dark-highlight">
-                    {activeView !== 'channel' && (
+                    {activeView !== 'channel' && activeView !== 'playlistDetail' && (
                         <div className="flex-shrink-0 pt-6 pb-4 px-2 md:px-4">
                             <h1 className="container mx-auto text-3xl md:text-4xl font-bold text-white">
-                                {viewTitles[activeView]}
+                                {getCurrentTitle()}
                             </h1>
                         </div>
                     )}

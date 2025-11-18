@@ -1,3 +1,4 @@
+
 import type { VideoItem } from '../types';
 
 const BASE_URL = 'https://www.googleapis.com/youtube/v3';
@@ -62,9 +63,9 @@ const fetchFromApiCore = async (endpoint: string, params: URLSearchParams): Prom
             return fetchFromApiCore(endpoint, params);
         }
 
-        // Gracefully handle invalid argument errors (e.g., for deleted videos)
-        if (response.status === 400 && errorData?.error?.message?.toLowerCase().includes('invalid argument')) {
-            console.warn('API returned 400: Invalid argument. Suppressing error and returning empty result.');
+        // Gracefully handle invalid argument errors (e.g., for deleted videos or non-existent channels)
+        if (response.status === 400 && errorData?.error?.status === 'INVALID_ARGUMENT') {
+            console.warn('API returned 400 INVALID_ARGUMENT. Suppressing error and returning empty result.');
             return { items: [] };
         }
 

@@ -33,3 +33,9 @@ export interface VideoItem {
     publishTime: string;
   };
 }
+
+export interface Playlist {
+  id: string;
+  name: string;
+  tracks: VideoItem[];
+}

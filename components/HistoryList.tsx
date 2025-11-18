@@ -1,10 +1,11 @@
+
 import React from 'react';
 import type { VideoItem } from '../types';
 
 interface HistoryListProps {
   history: VideoItem[];
   onSelectTrack: (track: VideoItem, contextList: VideoItem[]) => void;
-  onAddToPlaylist: (track: VideoItem) => void;
+  onOpenAddToPlaylistModal: (track: VideoItem) => void;
   onSelectChannel: (channelId: string, channelTitle: string) => void;
   offlineItems: VideoItem[];
   onAddToOffline: (track: VideoItem) => void;
@@ -14,13 +15,13 @@ interface HistoryListProps {
 const HistoryItem: React.FC<{
     item: VideoItem;
     onSelectTrack: (track: VideoItem, contextList: VideoItem[]) => void;
-    onAddToPlaylist: (track: VideoItem) => void;
+    onOpenAddToPlaylistModal: (track: VideoItem) => void;
     onSelectChannel: (channelId: string, channelTitle: string) => void;
     isOffline: boolean;
     onAddToOffline: (track: VideoItem) => void;
     isPlaying: boolean;
     history: VideoItem[];
-}> = ({ item, onSelectTrack, onAddToPlaylist, onSelectChannel, isOffline, onAddToOffline, isPlaying, history }) => (
+}> = ({ item, onSelectTrack, onOpenAddToPlaylistModal, onSelectChannel, isOffline, onAddToOffline, isPlaying, history }) => (
     <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
         <div className="relative w-12 h-12">
             <img
@@ -59,7 +60,7 @@ const HistoryItem: React.FC<{
                 <i className={`fas ${isOffline ? 'fa-check-circle' : 'fa-cloud-download-alt'}`}></i>
             </button>
             <button
-                onClick={() => onAddToPlaylist(item)}
+                onClick={() => onOpenAddToPlaylistModal(item)}
                 className={`p-2 w-10 rounded-full text-dark-subtext hover:text-white transition-colors duration-200`}
                 title="Tambahkan ke playlist"
             >
@@ -69,7 +70,7 @@ const HistoryItem: React.FC<{
     </div>
 );
 
-export const HistoryList: React.FC<HistoryListProps> = ({ history, onSelectTrack, onAddToPlaylist, onSelectChannel, offlineItems, onAddToOffline, currentTrackId }) => {
+export const HistoryList: React.FC<HistoryListProps> = ({ history, onSelectTrack, onOpenAddToPlaylistModal, onSelectChannel, offlineItems, onAddToOffline, currentTrackId }) => {
   if (history.length === 0) {
     return (
       <div className="text-center py-10 text-dark-subtext">
@@ -89,7 +90,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({ history, onSelectTrack
                 key={item.id.videoId} 
                 item={item}
                 onSelectTrack={onSelectTrack}
-                onAddToPlaylist={onAddToPlaylist}
+                onOpenAddToPlaylistModal={onOpenAddToPlaylistModal}
                 onSelectChannel={onSelectChannel}
                 isPlaying={currentTrackId === item.id.videoId}
                 isOffline={isOffline}
