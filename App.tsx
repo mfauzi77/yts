@@ -1,29 +1,40 @@
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+
+import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 import { SearchBar } from './components/SearchBar';
-import { Player } from './components/Player';
-import { SearchResultList } from './components/SearchResultsList';
-import { PlaylistListView } from './components/Playlist';
-import { HistoryList } from './components/HistoryList';
-import { searchVideos, getChannelVideos, getRelatedVideos } from './services/youtubeService';
+import { getChannelVideos, getRelatedVideos, searchVideos } from './services/youtubeService';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import type { VideoItem, Playlist } from './types';
 import { useYouTubePlayer } from './hooks/useYouTubePlayer';
-import { NowPlayingView } from './components/NowPlayingView';
-import { ChannelView } from './components/ChannelView';
-import { FloatingPlayer } from './components/FloatingPlayer';
-import { OfflineList } from './components/OfflineList';
 import { ApiStatusIndicator } from './components/ApiStatusIndicator';
 import { LandingPage } from './components/LandingPage';
 import { Sidebar } from './components/Sidebar';
 import { BottomNavBar } from './components/BottomNavBar';
 import { ErrorDisplay } from './components/ErrorDisplay';
 import { AutoplayOverlay } from './components/AutoplayOverlay';
-import { AddToPlaylistModal } from './components/AddToPlaylistModal';
-import { PlaylistDetailView } from './components/PlaylistDetailView';
 
-type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'offline' | 'channel';
+// Lazy load components that are not critical for the initial render
+const Player = lazy(() => import('./components/Player').then(m => ({ default: m.Player })));
+const SearchResultList = lazy(() => import('./components/SearchResultsList').then(m => ({ default: m.SearchResultList })));
+const PlaylistListView = lazy(() => import('./components/Playlist').then(m => ({ default: m.PlaylistListView })));
+const HistoryList = lazy(() => import('./components/HistoryList').then(m => ({ default: m.HistoryList })));
+const NowPlayingView = lazy(() => import('./components/NowPlayingView').then(m => ({ default: m.NowPlayingView })));
+const ChannelView = lazy(() => import('./components/ChannelView').then(m => ({ default: m.ChannelView })));
+const FloatingPlayer = lazy(() => import('./components/FloatingPlayer').then(m => ({ default: m.FloatingPlayer })));
+const OfflineList = lazy(() => import('./components/OfflineList').then(m => ({ default: m.OfflineList })));
+const AddToPlaylistModal = lazy(() => import('./components/AddToPlaylistModal').then(m => ({ default: m.AddToPlaylistModal })));
+const PlaylistDetailView = lazy(() => import('./components/PlaylistDetailView').then(m => ({ default: m.PlaylistDetailView })));
+const VideoFeed = lazy(() => import('./components/VideoFeed').then(m => ({ default: m.VideoFeed })));
+
+
+type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'offline' | 'channel' | 'video';
 type ApiStatus = 'idle' | 'success' | 'error';
+
+const LoadingSpinner: React.FC = () => (
+    <div className="flex justify-center items-center h-64">
+      <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-brand-red"></div>
+    </div>
+);
 
 const App: React.FC = () => {
     const [searchResults, setSearchResults] = useState<VideoItem[] | null>(null);
@@ -35,6 +46,7 @@ const App: React.FC = () => {
     const [isPlaying, setIsPlaying] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [isNowPlayingViewOpen, setIsNowPlayingViewOpen] = useState(false);
+    const [startInVideoMode, setStartInVideoMode] = useState(false);
     
     const [activeView, setActiveView] = useState<MainView>('home');
     const [selectedChannel, setSelectedChannel] = useState<{ id: string; title: string } | null>(null);
@@ -53,6 +65,7 @@ const App: React.FC = () => {
     const [offlineItems, setOfflineItems] = useLocalStorage<VideoItem[]>('ytas-offline', []);
     const [syncedOfflineIds, setSyncedOfflineIds] = useLocalStorage<string[]>('ytas-synced-ids', []);
     const [isAutoplayEnabled, setIsAutoplayEnabled] = useLocalStorage<boolean>('ytas-autoplay', true);
+    const [likedSongs, setLikedSongs] = useLocalStorage<string[]>('ytas-liked-songs', []);
     
     const [activePlaylist, setActivePlaylist] = useState<Playlist | null>(null);
     const [modalTrack, setModalTrack] = useState<VideoItem | null>(null);
@@ -64,6 +77,7 @@ const App: React.FC = () => {
     const [isSyncing, setIsSyncing] = useState(false);
     const isSyncingRef = useRef(false);
     const syncQueueRef = useRef<VideoItem[]>([]);
+    const [syncingTrackProgress, setSyncingTrackProgress] = useState<number>(0);
 
 
     useEffect(() => {
@@ -188,6 +202,7 @@ const App: React.FC = () => {
         setCurrentTrack(track);
         setIsPlaying(true);
         setIsAutoplayBlocked(false);
+        setStartInVideoMode(false); // Reset video mode default
         addToHistory(track);
 
         if (offlineItems.some(i => i.id.videoId === track.id.videoId)) {
@@ -201,6 +216,12 @@ const App: React.FC = () => {
             setIsNowPlayingViewOpen(true);
         }
     }, [addToHistory, offlineItems, setSyncedOfflineIds]);
+
+    const handleSelectVideo = useCallback((track: VideoItem, contextList: VideoItem[] = []) => {
+        handleSelectTrack(track, contextList);
+        setStartInVideoMode(true);
+        setIsNowPlayingViewOpen(true);
+    }, [handleSelectTrack]);
     
     const playNext = useCallback(() => {
         if (activePlaybackList.length === 0) return;
@@ -273,6 +294,14 @@ const App: React.FC = () => {
         onStateChange: handlePlayerStateChange,
     });
 
+    useEffect(() => {
+        if (isSyncingRef.current && duration > 0) {
+            setSyncingTrackProgress((currentTime / duration) * 100);
+        } else {
+            setSyncingTrackProgress(0);
+        }
+    }, [currentTime, duration]);
+
     const handleOpenAddToPlaylistModal = (track: VideoItem) => setModalTrack(track);
     const handleCloseAddToPlaylistModal = () => setModalTrack(null);
 
@@ -320,6 +349,60 @@ const App: React.FC = () => {
     
     const handleSelectPlaylist = (playlist: Playlist) => {
         setActivePlaylist(playlist);
+        setActiveView('playlistDetail');
+    };
+
+    const handleToggleLike = useCallback((track: VideoItem) => {
+        setLikedSongs(prev => {
+            const isLiked = prev.includes(track.id.videoId);
+            if (isLiked) {
+                return prev.filter(id => id !== track.id.videoId);
+            } else {
+                return [...prev, track.id.videoId];
+            }
+        });
+        
+        // Update virtual playlist if active
+        if (activePlaylist && activePlaylist.id === 'liked-songs') {
+            setActivePlaylist(prev => {
+                if (!prev) return null;
+                const isLiked = likedSongs.includes(track.id.videoId);
+                // Note: state update is async, so we check current state logic inverse
+                if (isLiked) {
+                     return { ...prev, tracks: prev.tracks.filter(t => t.id.videoId !== track.id.videoId) };
+                }
+                // Adding is complex here without the full track object if called from ID context, 
+                // but usually toggle like happens where we have the track.
+                // For simplicity in detail view we just remove.
+                return prev;
+            });
+        }
+
+    }, [setLikedSongs, likedSongs, activePlaylist]);
+    
+    const getLikedSongsPlaylist = useCallback((): Playlist => {
+        // Reconstruct playlist from history/offline/playlists to get full objects, 
+        // fallback to a minimal object if not found (might happen if liked then cache cleared)
+        const allKnownTracks = new Map<string, VideoItem>();
+        [...history, ...offlineItems, ...playlists.flatMap(p => p.tracks), ...(searchResults || []), ...recommendations].forEach(t => {
+            allKnownTracks.set(t.id.videoId, t);
+        });
+        
+        // Special case: current track might not be in lists yet
+        if (currentTrack) allKnownTracks.set(currentTrack.id.videoId, currentTrack);
+
+        const tracks = likedSongs.map(id => allKnownTracks.get(id)).filter((t): t is VideoItem => !!t);
+        
+        return {
+            id: 'liked-songs',
+            name: 'Lagu yang Disukai',
+            tracks: tracks.reverse() // Newest first
+        };
+    }, [likedSongs, history, offlineItems, playlists, searchResults, recommendations, currentTrack]);
+
+
+    const handleSelectLikedSongs = () => {
+        setActivePlaylist(getLikedSongsPlaylist());
         setActiveView('playlistDetail');
     };
     
@@ -419,12 +502,25 @@ const App: React.FC = () => {
                     offlineItems={offlineItems}
                     onAddToOffline={handleAddToOffline}
                     currentTrackId={currentTrack?.id.videoId}
+                    likedSongs={likedSongs}
+                    onToggleLike={handleToggleLike}
+                />;
+            case 'video':
+                return <VideoFeed
+                    onSelectTrack={handleSelectVideo}
+                    onOpenAddToPlaylistModal={handleOpenAddToPlaylistModal}
+                    onSelectChannel={handleSelectChannel}
+                    offlineItems={offlineItems}
+                    onAddToOffline={handleAddToOffline}
+                    currentTrackId={currentTrack?.id.videoId}
                 />;
             case 'playlists':
                 return <PlaylistListView
                     playlists={playlists}
                     onSelectPlaylist={handleSelectPlaylist}
                     onCreatePlaylist={handleCreatePlaylist}
+                    onSelectLikedSongs={handleSelectLikedSongs}
+                    hasLikedSongs={likedSongs.length > 0}
                 />;
             case 'playlistDetail':
                  if (!activePlaylist) return null;
@@ -441,6 +537,8 @@ const App: React.FC = () => {
                     onBack={handleBackToPlaylists}
                     onDelete={() => handleDeletePlaylist(activePlaylist.id)}
                     onRename={(newName) => handleRenamePlaylist(activePlaylist.id, newName)}
+                    likedSongs={likedSongs}
+                    onToggleLike={handleToggleLike}
                 />;
             case 'history':
                 return <HistoryList
@@ -451,6 +549,8 @@ const App: React.FC = () => {
                     offlineItems={offlineItems}
                     onAddToOffline={handleAddToOffline}
                     currentTrackId={currentTrack?.id.videoId}
+                    likedSongs={likedSongs}
+                    onToggleLike={handleToggleLike}
                 />;
             case 'offline':
                  return <OfflineList
@@ -462,6 +562,7 @@ const App: React.FC = () => {
                     currentTrackId={currentTrack?.id.videoId}
                     isSyncing={isSyncing}
                     onStartSync={handleStartSync}
+                    syncingTrackProgress={syncingTrackProgress}
                 />;
             case 'channel':
                 if (!selectedChannel) return null;
@@ -478,6 +579,8 @@ const App: React.FC = () => {
                     currentTrackId={currentTrack?.id.videoId}
                     onLoadMore={handleLoadMoreChannelVideos}
                     hasNextPage={!!channelNextPageToken}
+                    likedSongs={likedSongs}
+                    onToggleLike={handleToggleLike}
                 />;
             default: return null;
         }
@@ -485,6 +588,7 @@ const App: React.FC = () => {
 
     const viewTitles: { [key in MainView]?: string } = {
         home: 'Beranda',
+        video: 'Video',
         playlists: 'Playlist',
         history: 'Riwayat',
         offline: 'Koleksi Offline',
@@ -500,15 +604,17 @@ const App: React.FC = () => {
         <>
             {isLandingPageMounted && <LandingPage onEnter={handleEnterApp} isExiting={isAppEntered} />}
             
-            {modalTrack && (
-                <AddToPlaylistModal
-                    track={modalTrack}
-                    playlists={playlists}
-                    onClose={handleCloseAddToPlaylistModal}
-                    onAddToPlaylist={(playlistId, track) => handleAddTrackToPlaylist(playlistId, track)}
-                    onCreateAndAdd={handleCreatePlaylistAndAdd}
-                />
-            )}
+            <Suspense fallback={null}>
+                {modalTrack && (
+                    <AddToPlaylistModal
+                        track={modalTrack}
+                        playlists={playlists}
+                        onClose={handleCloseAddToPlaylistModal}
+                        onAddToPlaylist={(playlistId, track) => handleAddTrackToPlaylist(playlistId, track)}
+                        onCreateAndAdd={handleCreatePlaylistAndAdd}
+                    />
+                )}
+            </Suspense>
 
             <div className={`grid h-screen font-sans transition-opacity duration-500 ${isAppEntered ? 'opacity-100' : 'opacity-0'} ${currentTrack ? 'grid-rows-[1fr_auto]' : 'grid-rows-1'} grid-cols-1 md:grid-cols-[250px_1fr] bg-dark-bg text-dark-text`}>
                 <Sidebar activeView={activeView} setActiveView={setActiveView} />
@@ -536,66 +642,79 @@ const App: React.FC = () => {
                     <main className="flex-grow p-2 md:p-4 overflow-y-auto pb-36 md:pb-4 bg-gradient-to-b from-dark-highlight to-dark-bg rounded-t-lg">
                         <div className="container mx-auto">
                            {error && <ErrorDisplay message={error} onDismiss={() => setError(null)} />}
-                           {renderMainView()}
+                           <Suspense fallback={<LoadingSpinner />}>
+                                {renderMainView()}
+                           </Suspense>
                         </div>
                     </main>
                 </div>
                 
-                {currentTrack && !isMiniPlayerActive && (
-                    <footer className="col-span-1 md:col-span-2 z-30">
-                        <Player
+                <Suspense fallback={<div className="col-span-1 md:col-span-2 z-30 h-[88px] bg-dark-surface"></div>}>
+                    {currentTrack && !isMiniPlayerActive && (
+                        <footer className="col-span-1 md:col-span-2 z-30">
+                            <Player
+                                track={currentTrack}
+                                isPlaying={isPlaying}
+                                setIsPlaying={setIsPlaying}
+                                onNext={playNext}
+                                onPrev={playPrev}
+                                onToggleNowPlaying={() => setIsNowPlayingViewOpen(true)}
+                                volume={volume}
+                                setVolume={setVolume}
+                                currentTime={currentTime}
+                                duration={duration}
+                                seekTo={seekTo}
+                                onSelectChannel={handleSelectChannel}
+                                onToggleMiniPlayer={() => setIsMiniPlayerActive(p => !p)}
+                                isAutoplayEnabled={isAutoplayEnabled}
+                                onToggleAutoplay={() => setIsAutoplayEnabled(p => !p)}
+                                isLiked={likedSongs.includes(currentTrack.id.videoId)}
+                                onToggleLike={() => handleToggleLike(currentTrack)}
+                            />
+                        </footer>
+                    )}
+                </Suspense>
+                
+                <Suspense fallback={null}>
+                    {currentTrack && isMiniPlayerActive && (
+                        <FloatingPlayer
                             track={currentTrack}
                             isPlaying={isPlaying}
                             setIsPlaying={setIsPlaying}
                             onNext={playNext}
                             onPrev={playPrev}
-                            onToggleNowPlaying={() => setIsNowPlayingViewOpen(true)}
+                            onClose={() => setIsMiniPlayerActive(false)}
+                        />
+                    )}
+                </Suspense>
+
+                <Suspense fallback={null}>
+                    {currentTrack && (
+                        <NowPlayingView
+                            isOpen={isNowPlayingViewOpen}
+                            onClose={() => setIsNowPlayingViewOpen(false)}
+                            track={currentTrack}
+                            isPlaying={isPlaying}
+                            setIsPlaying={setIsPlaying}
+                            onNext={playNext}
+                            onPrev={playPrev}
                             volume={volume}
                             setVolume={setVolume}
                             currentTime={currentTime}
                             duration={duration}
                             seekTo={seekTo}
-                            onSelectChannel={handleSelectChannel}
-                            onToggleMiniPlayer={() => setIsMiniPlayerActive(p => !p)}
                             isAutoplayEnabled={isAutoplayEnabled}
                             onToggleAutoplay={() => setIsAutoplayEnabled(p => !p)}
-                        />
-                    </footer>
-                )}
-                
-                {currentTrack && isMiniPlayerActive && (
-                    <FloatingPlayer
-                        track={currentTrack}
-                        isPlaying={isPlaying}
-                        setIsPlaying={setIsPlaying}
-                        onNext={playNext}
-                        onPrev={playPrev}
-                        onClose={() => setIsMiniPlayerActive(false)}
-                    />
-                )}
-
-                {currentTrack && (
-                    <NowPlayingView
-                        isOpen={isNowPlayingViewOpen}
-                        onClose={() => setIsNowPlayingViewOpen(false)}
-                        track={currentTrack}
-                        isPlaying={isPlaying}
-                        setIsPlaying={setIsPlaying}
-                        onNext={playNext}
-                        onPrev={playPrev}
-                        volume={volume}
-                        setVolume={setVolume}
-                        currentTime={currentTime}
-                        duration={duration}
-                        seekTo={seekTo}
-                        isAutoplayEnabled={isAutoplayEnabled}
-                        onToggleAutoplay={() => setIsAutoplayEnabled(p => !p)}
-                    >
-                        {isAutoplayBlocked && (
-                            <AutoplayOverlay track={currentTrack} onForcePlay={handleForcePlay} />
-                        )}
-                   </NowPlayingView>
-                )}
+                            isLiked={likedSongs.includes(currentTrack.id.videoId)}
+                            onToggleLike={() => handleToggleLike(currentTrack)}
+                            startInVideoMode={startInVideoMode}
+                        >
+                            {isAutoplayBlocked && (
+                                <AutoplayOverlay track={currentTrack} onForcePlay={handleForcePlay} />
+                            )}
+                       </NowPlayingView>
+                    )}
+                </Suspense>
             </div>
             <BottomNavBar activeView={activeView} setActiveView={setActiveView} />
         </>

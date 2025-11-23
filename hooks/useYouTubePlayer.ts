@@ -52,7 +52,7 @@ export const useYouTubePlayer = ({ videoId, isPlaying, onStateChange }: UseYouTu
                     'autoplay': 1,
                     'controls': 0,
                     'disablekb': 1,
-                    'fs': 0,
+                    'fs': 1, // Enable fullscreen API permission
                 },
                 events: {
                     'onReady': () => {
