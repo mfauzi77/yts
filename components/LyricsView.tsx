@@ -37,7 +37,7 @@ export const LyricsView: React.FC<LyricsViewProps> = ({ track }) => {
 
     if (isEditing) {
         return (
-            <div className="w-full h-full flex flex-col p-4 bg-dark-card/50 rounded-lg">
+            <div className="w-full h-full flex flex-col p-4 bg-dark-card/50 rounded-lg border border-white/5">
                 <textarea
                     value={editText}
                     onChange={(e) => setEditText(e.target.value)}
@@ -47,29 +47,29 @@ export const LyricsView: React.FC<LyricsViewProps> = ({ track }) => {
                 />
                 <div className="flex justify-center space-x-4 mt-4">
                     <button onClick={handleSave} className="px-4 py-2 bg-brand-red text-white font-semibold rounded-full hover:bg-red-700 transition-colors">Simpan</button>
-                    <button onClick={handleCancel} className="px-4 py-2 bg-dark-surface text-white font-semibold rounded-full hover:bg-dark-highlight transition-colors">Batal</button>
+                    <button onClick={handleCancel} className="px-4 py-2 bg-dark-highlight text-white font-semibold rounded-full hover:bg-white/10 transition-colors">Batal</button>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-dark-card/50 rounded-lg text-center">
+        <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-dark-card/30 backdrop-blur-sm rounded-lg text-center border border-white/5">
             {currentLyrics ? (
                 <>
                     <pre className="whitespace-pre-wrap text-white/90 font-sans overflow-y-auto h-full w-full">
                         {currentLyrics}
                     </pre>
-                    <button onClick={handleEdit} className="mt-4 px-4 py-2 bg-dark-surface text-white font-semibold rounded-full hover:bg-dark-highlight transition-colors text-sm">
+                    <button onClick={handleEdit} className="mt-4 px-4 py-2 bg-dark-surface text-white font-semibold rounded-full hover:bg-dark-highlight transition-colors text-sm border border-white/5">
                         <i className="fas fa-pencil-alt mr-2"></i>
                         Ubah Lirik
                     </button>
                 </>
             ) : (
                 <div className="flex flex-col items-center justify-center">
-                    <i className="fas fa-microphone-alt-slash text-4xl text-dark-subtext mb-4"></i>
+                    <i className="fas fa-microphone-alt-slash text-4xl text-dark-subtext mb-4 opacity-50"></i>
                     <p className="text-dark-subtext">Lirik tidak tersedia.</p>
-                    <button onClick={handleEdit} className="mt-4 px-4 py-2 bg-brand-red text-white font-semibold rounded-full hover:bg-red-700 transition-colors">
+                    <button onClick={handleEdit} className="mt-4 px-4 py-2 bg-brand-red text-white font-semibold rounded-full hover:bg-red-700 transition-colors shadow-lg shadow-red-900/20">
                          <i className="fas fa-plus mr-2"></i>
                         Tambahkan Lirik
                     </button>

@@ -64,32 +64,32 @@ export const FloatingPlayer: React.FC<FloatingPlayerProps> = ({ track, isPlaying
   return (
     <div
       ref={playerRef}
-      className="fixed z-50 w-72 p-3 bg-white/80 dark:bg-dark-surface/80 backdrop-blur-md rounded-xl shadow-2xl flex items-center space-x-3"
+      className="fixed z-50 w-72 p-3 bg-dark-surface/90 backdrop-blur-md rounded-xl shadow-black/50 shadow-2xl flex items-center space-x-3 border border-white/5"
       style={{ left: `${position.x}px`, top: `${position.y}px`, touchAction: 'none' }}
       onMouseDown={handleMouseDown}
     >
       <img
         src={track.snippet.thumbnails.default.url}
         alt={track.snippet.title}
-        className="w-16 h-16 rounded-lg object-cover flex-shrink-0 pointer-events-none drag-handle cursor-grab"
+        className="w-16 h-16 rounded-lg object-cover flex-shrink-0 pointer-events-none drag-handle cursor-grab border border-white/10"
       />
       <div className="flex-grow min-w-0">
-        <p className="text-sm font-bold text-gray-900 dark:text-white truncate pointer-events-none">{track.snippet.title}</p>
+        <p className="text-sm font-bold text-white truncate pointer-events-none">{track.snippet.title}</p>
         <div className="flex items-center space-x-3 mt-2">
-          <button onClick={onPrev} className="text-gray-600 dark:text-dark-subtext hover:text-black dark:hover:text-white transition-colors">
+          <button onClick={onPrev} className="text-dark-subtext hover:text-white transition-colors">
             <i className="fas fa-step-backward"></i>
           </button>
           <button onClick={() => setIsPlaying(!isPlaying)} className="w-8 h-8 flex items-center justify-center bg-brand-red text-white rounded-full shadow-md hover:bg-red-700">
             <i className={`fas ${isPlaying ? 'fa-pause' : 'fa-play'}`}></i>
           </button>
-          <button onClick={onNext} className="text-gray-600 dark:text-dark-subtext hover:text-black dark:hover:text-white transition-colors">
+          <button onClick={onNext} className="text-dark-subtext hover:text-white transition-colors">
             <i className="fas fa-step-forward"></i>
           </button>
         </div>
       </div>
        <button 
             onClick={onClose} 
-            className="absolute top-1 right-1 w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-300 dark:text-dark-subtext dark:hover:bg-dark-card transition-colors"
+            className="absolute top-1 right-1 w-8 h-8 flex items-center justify-center rounded-full text-dark-subtext hover:bg-dark-card hover:text-white transition-colors"
             title="Perluas Pemutar"
             aria-label="Perluas pemutar"
         >

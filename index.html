@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
   <head>
-    <meta charset="UTF-ag" />
+    <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>YTS</title>
     <link rel="manifest" href="/manifest.json" />
@@ -14,17 +14,39 @@
           extend: {
             colors: {
               'brand-red': '#FF0000',
-              'dark-bg': '#121212',
-              'dark-surface': '#181818',
-              'dark-card': '#282828',
+              'dark-bg': '#0f0f0f',
+              'dark-surface': '#212121',
+              'dark-card': '#272727',
               'dark-text': '#FFFFFF',
-              'dark-subtext': '#b3b3b3',
-              'dark-highlight': '#1f1f1f',
+              'dark-subtext': '#AAAAAA',
+              'dark-highlight': '#3F3F3F',
             }
           }
         }
       }
     </script>
+    <style>
+      /* Custom Scrollbar for Dark Mode */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #0f0f0f; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #3F3F3F; 
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #555; 
+      }
+      
+      body {
+        background-color: #0f0f0f;
+        color: white;
+      }
+    </style>
   <script type="importmap">
 {
   "imports": {
@@ -36,7 +58,7 @@
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
-  <body class="bg-dark-bg antialiased">
+  <body class="bg-dark-bg antialiased text-dark-text">
     <div id="root"></div>
     <div id="player-container"></div>
     <script type="module" src="/index.tsx"></script>
