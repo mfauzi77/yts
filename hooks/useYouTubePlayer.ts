@@ -45,14 +45,19 @@ export const useYouTubePlayer = ({ videoId, isPlaying, onStateChange }: UseYouTu
     const initializePlayer = useCallback(() => {
         if (window.YT && window.YT.Player) {
             playerRef.current = new window.YT.Player('player-container', {
-                height: '0',
-                width: '0',
+                height: '100%',
+                width: '100%',
                 playerVars: {
                     'playsinline': 1,
                     'autoplay': 1,
                     'controls': 0,
                     'disablekb': 1,
                     'fs': 1, // Enable fullscreen API permission
+                    'origin': window.location.origin, // Fix for Error 153
+                    'widget_referrer': window.location.origin,
+                    'enablejsapi': 1,
+                    'rel': 0,
+                    'iv_load_policy': 3, // Hide annotations
                 },
                 events: {
                     'onReady': () => {

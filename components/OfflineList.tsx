@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { VideoItem } from '../types';
 
@@ -11,17 +10,8 @@ interface OfflineListProps {
   currentTrackId?: string | null;
   isSyncing: boolean;
   onStartSync: () => void;
+  syncingTrackProgress: number;
 }
-
-const StatusIcon: React.FC<{ isSynced: boolean; isPlaying: boolean; isSyncing: boolean; }> = ({ isSynced, isPlaying, isSyncing }) => {
-    if (isPlaying && isSyncing) {
-        return <i className="fas fa-spinner fa-spin text-blue-400" title="Menyinkronkan..."></i>;
-    }
-    if (isSynced) {
-        return <i className="fas fa-check-circle text-green-500" title="Tersedia offline"></i>;
-    }
-    return <i className="fas fa-cloud text-dark-subtext" title="Menunggu sinkronisasi"></i>;
-};
 
 const OfflineItem: React.FC<{
     item: VideoItem;
@@ -33,47 +23,83 @@ const OfflineItem: React.FC<{
     isSynced: boolean;
     isSyncing: boolean;
     offlinePlaylist: VideoItem[];
-}> = ({ item, index, onSelectTrack, onRemoveFromOfflinePlaylist, onSelectChannel, isPlaying, isSynced, isSyncing, offlinePlaylist }) => (
-    <div className="grid grid-cols-[20px_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
-        <div className="flex items-center justify-center text-dark-subtext">
-            <span className="group-hover:hidden">{index + 1}</span>
-            <button onClick={() => onSelectTrack(item, offlinePlaylist)} className="hidden group-hover:block" aria-label={`Putar ${item.snippet.title}`}>
-                <i className="fas fa-play text-white"></i>
-            </button>
-        </div>
-        <div className="flex items-center gap-4">
-             <img
-                src={item.snippet.thumbnails.default.url}
-                alt={item.snippet.title}
-                className="w-10 h-10 rounded-md object-cover"
-            />
-            <div className="min-w-0">
-                <p className={`text-sm font-semibold truncate cursor-pointer ${isPlaying ? 'text-brand-red' : 'text-white'}`} onClick={() => onSelectTrack(item, offlinePlaylist)}>
-                    {item.snippet.title}
-                </p>
-                <p 
-                    className="text-xs text-dark-subtext cursor-pointer hover:underline"
-                    onClick={() => onSelectChannel(item.snippet.channelId, item.snippet.channelTitle)}
-                >
-                    {item.snippet.channelTitle}
-                </p>
-            </div>
-        </div>
-        <div className="flex items-center space-x-2 flex-shrink-0">
-            <div className="w-6 text-center">
-                <StatusIcon isSynced={isSynced} isPlaying={isPlaying} isSyncing={isSyncing} />
-            </div>
-            <button 
-                onClick={() => onRemoveFromOfflinePlaylist(item.id.videoId)} 
-                className="p-2 w-10 rounded-full text-dark-subtext hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                title="Hapus dari Offline"
-            >
-                <i className="fas fa-trash-alt"></i>
-            </button>
-        </div>
-    </div>
-);
+    syncingTrackProgress: number;
+}> = ({ item, index, onSelectTrack, onRemoveFromOfflinePlaylist, onSelectChannel, isPlaying, isSynced, isSyncing, offlinePlaylist, syncingTrackProgress }) => {
+    
+    let statusDisplay;
+    
+    if (isPlaying && isSyncing) {
+        const radius = 9;
+        const circumference = 2 * Math.PI * radius;
+        const offset = circumference - (syncingTrackProgress / 100) * circumference;
 
+        statusDisplay = (
+            <div className="relative w-6 h-6 flex items-center justify-center" title="Menyinkronkan...">
+                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r={radius} fill="none" stroke="#272727" strokeWidth="2" />
+                    <circle 
+                        cx="12" cy="12" r={radius} 
+                        fill="none" 
+                        stroke="#FF0000" 
+                        strokeWidth="2" 
+                        strokeDasharray={circumference} 
+                        strokeDashoffset={offset}
+                        strokeLinecap="round"
+                        className="transition-all duration-200"
+                    />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-[6px] font-bold text-white">{Math.round(syncingTrackProgress)}%</span>
+                </div>
+            </div>
+        );
+    } else if (isSynced) {
+        statusDisplay = <i className="fas fa-check-circle text-green-500" title="Tersedia offline"></i>;
+    } else {
+        statusDisplay = <i className="fas fa-cloud text-dark-subtext" title="Menunggu sinkronisasi"></i>;
+    }
+
+    return (
+        <div className="grid grid-cols-[20px_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
+            <div className="flex items-center justify-center text-dark-subtext">
+                <span className="group-hover:hidden">{index + 1}</span>
+                <button onClick={() => onSelectTrack(item, offlinePlaylist)} className="hidden group-hover:block" aria-label={`Putar ${item.snippet.title}`}>
+                    <i className="fas fa-play text-white"></i>
+                </button>
+            </div>
+            <div className="flex items-center gap-4">
+                <img
+                    src={item.snippet.thumbnails.default.url}
+                    alt={item.snippet.title}
+                    className="w-10 h-10 rounded-md object-cover"
+                />
+                <div className="min-w-0">
+                    <p className={`text-sm font-semibold truncate cursor-pointer ${isPlaying ? 'text-brand-red' : 'text-white'}`} onClick={() => onSelectTrack(item, offlinePlaylist)}>
+                        {item.snippet.title}
+                    </p>
+                    <p 
+                        className="text-xs text-dark-subtext cursor-pointer hover:underline"
+                        onClick={() => onSelectChannel(item.snippet.channelId, item.snippet.channelTitle)}
+                    >
+                        {item.snippet.channelTitle}
+                    </p>
+                </div>
+            </div>
+            <div className="flex items-center space-x-3 flex-shrink-0">
+                <div className="w-6 flex justify-center">
+                    {statusDisplay}
+                </div>
+                <button 
+                    onClick={() => onRemoveFromOfflinePlaylist(item.id.videoId)} 
+                    className="p-2 w-8 h-8 flex items-center justify-center rounded-full text-dark-subtext hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Hapus dari Offline"
+                >
+                    <i className="fas fa-trash-alt"></i>
+                </button>
+            </div>
+        </div>
+    );
+};
 
 export const OfflineList: React.FC<OfflineListProps> = ({ 
     offlinePlaylist, 
@@ -83,7 +109,8 @@ export const OfflineList: React.FC<OfflineListProps> = ({
     onSelectChannel, 
     currentTrackId,
     isSyncing,
-    onStartSync
+    onStartSync,
+    syncingTrackProgress
 }) => {
   
   const unsyncedCount = offlinePlaylist.filter(item => !syncedOfflineIds.includes(item.id.videoId)).length;
@@ -144,6 +171,7 @@ export const OfflineList: React.FC<OfflineListProps> = ({
                     isSynced={syncedOfflineIds.includes(item.id.videoId)}
                     isSyncing={isSyncing}
                     offlinePlaylist={offlinePlaylist}
+                    syncingTrackProgress={syncingTrackProgress}
                 />
             ))}
         </div>

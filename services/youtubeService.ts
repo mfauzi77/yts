@@ -52,9 +52,9 @@ const fetchFromApiCore = async (endpoint: string, params: URLSearchParams): Prom
         }
 
         const errorData = await response.json();
-        console.error('YouTube API Error:', JSON.stringify(errorData, null, 2));
 
-        if (response.status === 403 || (response.status === 400 && errorData?.error?.message.includes('API key not valid'))) {
+        // Handle Key Rotation (403 or 400 with invalid key message)
+        if (response.status === 403 || (response.status === 400 && errorData?.error?.message?.includes('API key not valid'))) {
             const reason = response.status === 403 ? "kuota habis" : "tidak valid";
             console.warn(`Kunci API ke-${currentApiKeyIndex + 1} gagal (${reason}). Mencoba kunci berikutnya...`);
             
@@ -65,9 +65,12 @@ const fetchFromApiCore = async (endpoint: string, params: URLSearchParams): Prom
 
         // Gracefully handle invalid argument errors (e.g., for deleted videos or non-existent channels)
         if (response.status === 400 && errorData?.error?.status === 'INVALID_ARGUMENT') {
-            console.warn('API returned 400 INVALID_ARGUMENT. Suppressing error and returning empty result.');
+            console.warn(`API returned 400 INVALID_ARGUMENT for endpoint ${endpoint}. Suppressing error and returning empty result.`);
             return { items: [] };
         }
+
+        // Only log actual unhandled errors to the console
+        console.error('YouTube API Error:', JSON.stringify(errorData, null, 2));
 
         const errorMessage = errorData.error?.message || 'Unknown API error';
         throw new Error(`Permintaan API YouTube gagal dengan status ${response.status}: ${errorMessage}`);
