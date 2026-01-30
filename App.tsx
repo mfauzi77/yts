@@ -19,13 +19,12 @@ const PlaylistListView = lazy(() => import('./components/Playlist').then(m => ({
 const HistoryList = lazy(() => import('./components/HistoryList').then(m => ({ default: m.HistoryList })));
 const NowPlayingView = lazy(() => import('./components/NowPlayingView').then(m => ({ default: m.NowPlayingView })));
 const ChannelView = lazy(() => import('./components/ChannelView').then(m => ({ default: m.ChannelView })));
-const FloatingPlayer = lazy(() => import('./components/FloatingPlayer').then(m => ({ default: m.FloatingPlayer })));
 const OfflineList = lazy(() => import('./components/OfflineList').then(m => ({ default: m.OfflineList })));
 const AddToPlaylistModal = lazy(() => import('./components/AddToPlaylistModal').then(m => ({ default: m.AddToPlaylistModal })));
 const PlaylistDetailView = lazy(() => import('./components/PlaylistDetailView').then(m => ({ default: m.PlaylistDetailView })));
 const LiteView = lazy(() => import('./components/LiteView').then(m => ({ default: m.LiteView })));
 
-type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'offline' | 'channel' | 'video' | 'lite';
+type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'offline' | 'channel' | 'lite';
 type ApiStatus = 'idle' | 'success' | 'error';
 
 const LoadingSpinner: React.FC = () => (
@@ -44,15 +43,12 @@ const App: React.FC = () => {
     const [isPlaying, setIsPlaying] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [isNowPlayingViewOpen, setIsNowPlayingViewOpen] = useState(false);
-    const [startInVideoMode, setStartInVideoMode] = useState(false);
     
     const [activeView, setActiveView] = useState<MainView>('home');
     const [selectedChannel, setSelectedChannel] = useState<{ id: string; title: string } | null>(null);
     const [channelVideos, setChannelVideos] = useState<VideoItem[]>([]);
     const [isChannelLoading, setIsChannelLoading] = useState<boolean>(false);
-    const [isChannelMoreLoading, setIsChannelMoreLoading] = useState<boolean>(false);
     const [channelNextPageToken, setChannelNextPageToken] = useState<string | undefined>(undefined);
-    const [isMiniPlayerActive, setIsMiniPlayerActive] = useState(false);
     const [apiStatus, setApiStatus] = useState<ApiStatus>('idle');
     const [isAppEntered, setIsAppEntered] = useState<boolean>(false);
     const [isLandingPageMounted, setIsLandingPageMounted] = useState<boolean>(true);
@@ -70,18 +66,53 @@ const App: React.FC = () => {
 
     const [activePlaybackList, setActivePlaybackList] = useState<VideoItem[]>([]);
     const currentTrackIndexRef = React.useRef(-1);
-    const isAttemptingAutoplay = useRef(false);
     
     const [isSyncing, setIsSyncing] = useState(false);
-    const isSyncingRef = useRef(false);
-    const syncQueueRef = useRef<VideoItem[]>([]);
     const [syncingTrackProgress, setSyncingTrackProgress] = useState<number>(0);
 
     const handleApiError = (err: unknown) => {
-        const message = err instanceof Error ? err.message : 'Terjadi galat yang tidak diketahui.';
+        const message = err instanceof Error ? err.message : 'Terjadi galat.';
         setError(message);
         setApiStatus('error');
     };
+
+    // Logic Sinkronisasi Offline yang diperbarui
+    const startOfflineSync = useCallback(async () => {
+        if (isSyncing || offlineItems.length === 0) return;
+        
+        setIsSyncing(true);
+        setSyncingTrackProgress(0);
+        
+        const unsyncedItems = offlineItems.filter(item => !syncedOfflineIds.includes(item.id.videoId));
+        
+        if (unsyncedItems.length === 0) {
+            setIsSyncing(false);
+            return;
+        }
+
+        let completed = 0;
+        for (const item of unsyncedItems) {
+            try {
+                // 1. Trigger Thumbnail Cache melalui fetch (Service Worker akan menangkapnya)
+                const imgUrl = item.snippet.thumbnails.high?.url || item.snippet.thumbnails.default.url;
+                await fetch(imgUrl, { mode: 'no-cors' });
+                
+                // 2. Tandai sebagai tersinkronisasi
+                setSyncedOfflineIds(prev => [...new Set([...prev, item.id.videoId])]);
+                
+                completed++;
+                setSyncingTrackProgress((completed / unsyncedItems.length) * 100);
+                
+                // Jeda kecil agar tidak memberatkan browser
+                await new Promise(r => setTimeout(r, 500));
+            } catch (err) {
+                console.error("Gagal sinkronisasi item:", item.snippet.title);
+            }
+        }
+        
+        setIsSyncing(false);
+        setSyncingTrackProgress(100);
+    }, [isSyncing, offlineItems, syncedOfflineIds, setSyncedOfflineIds]);
 
     useEffect(() => {
         if (apiStatus === 'success' || apiStatus === 'error') {
@@ -141,9 +172,9 @@ const App: React.FC = () => {
         setCurrentTrack(track);
         setIsPlaying(true);
         setIsAutoplayBlocked(false);
-        setStartInVideoMode(false);
         addToHistory(track);
 
+        // Otomatis sinkronkan metadata jika diputar
         if (offlineItems.some(i => i.id.videoId === track.id.videoId)) {
             setSyncedOfflineIds(prev => [...new Set([...prev, track.id.videoId])]);
         }
@@ -158,64 +189,27 @@ const App: React.FC = () => {
 
     const playNext = useCallback(() => {
         if (activePlaybackList.length === 0) return;
-        isAttemptingAutoplay.current = true;
         currentTrackIndexRef.current = (currentTrackIndexRef.current + 1) % activePlaybackList.length;
         handleSelectTrack(activePlaybackList[currentTrackIndexRef.current], activePlaybackList);
     }, [activePlaybackList, handleSelectTrack]);
 
     const playPrev = useCallback(() => {
         if (activePlaybackList.length === 0) return;
-        isAttemptingAutoplay.current = false;
         currentTrackIndexRef.current = (currentTrackIndexRef.current - 1 + activePlaybackList.length) % activePlaybackList.length;
         handleSelectTrack(activePlaybackList[currentTrackIndexRef.current], activePlaybackList);
     }, [activePlaybackList, handleSelectTrack]);
 
-    const playRelatedVideo = useCallback(async () => {
-        if (!currentTrack) return;
-        isAttemptingAutoplay.current = true;
-        try {
-            const relatedVideos = await getRelatedVideos(currentTrack.id.videoId);
-            const playableRelated = relatedVideos.filter(v => v.id.videoId !== currentTrack.id.videoId);
-            if (playableRelated.length > 0) {
-                handleSelectTrack(playableRelated[0], playableRelated);
-            } else {
-                setIsPlaying(false);
-            }
-            setApiStatus('success');
-        } catch (err) {
-            handleApiError(err);
-            setIsPlaying(false);
-        }
-    }, [currentTrack, handleSelectTrack]);
-
     const handlePlayerStateChange = useCallback((event: { data: number }) => {
-        if (isAttemptingAutoplay.current && (event.data === 2 || event.data === 5)) {
-            setIsAutoplayBlocked(true);
-            setIsPlaying(false);
-            isAttemptingAutoplay.current = false;
-        } else if (event.data === 1) {
+        if (event.data === 1) {
             setIsPlaying(true);
-            setIsAutoplayBlocked(false);
         } else if (event.data === 2) {
             setIsPlaying(false);
         } else if (event.data === 0) {
-            if (isSyncingRef.current && syncQueueRef.current.length > 0) {
-                const nextTrack = syncQueueRef.current[0];
-                syncQueueRef.current = syncQueueRef.current.slice(1);
-                handleSelectTrack(nextTrack, [nextTrack, ...syncQueueRef.current]);
-            } else if (isSyncingRef.current) {
-                isSyncingRef.current = false;
-                setIsSyncing(false);
-                setIsPlaying(false);
-            } else if (isAutoplayEnabled) {
-                if (currentTrackIndexRef.current !== -1 && activePlaybackList.length > 0) {
-                    playNext();
-                } else {
-                    playRelatedVideo();
-                }
+            if (isAutoplayEnabled) {
+                playNext();
             }
         }
-    }, [playNext, isAutoplayEnabled, activePlaybackList.length, playRelatedVideo, handleSelectTrack]);
+    }, [playNext, isAutoplayEnabled]);
 
     const { volume, setVolume, seekTo, currentTime, duration } = useYouTubePlayer({
         videoId: currentTrack?.id.videoId ?? null,
@@ -241,26 +235,17 @@ const App: React.FC = () => {
         handleCloseAddToPlaylistModal();
     };
 
-    const handleRemoveTrackFromPlaylist = (playlistId: string, trackId: string) => {
-        setPlaylists(prev => prev.map(p => {
-            if (p.id === playlistId) {
-                return { ...p, tracks: p.tracks.filter(t => t.id.videoId !== trackId) };
-            }
-            return p;
-        }));
-    };
-
-    const handleSelectPlaylist = (playlist: Playlist) => {
-        setActivePlaylist(playlist);
-        setActiveView('playlistDetail');
-    };
-
     const handleToggleLike = useCallback((track: VideoItem) => {
         setLikedSongs(prev => prev.includes(track.id.videoId) ? prev.filter(id => id !== track.id.videoId) : [...prev, track.id.videoId]);
     }, [setLikedSongs]);
 
     const handleAddToOffline = useCallback((track: VideoItem) => {
-        setOfflineItems(prev => prev.some(item => item.id.videoId === track.id.videoId) ? prev : [track, ...prev]);
+        setOfflineItems(prev => {
+            const alreadyExists = prev.some(item => item.id.videoId === track.id.videoId);
+            if (alreadyExists) return prev;
+            return [track, ...prev];
+        });
+        // Berikan notifikasi kecil atau feedback visual jika perlu
     }, [setOfflineItems]);
 
     const handleSelectChannel = useCallback(async (channelId: string, channelTitle: string) => {
@@ -309,7 +294,7 @@ const App: React.FC = () => {
             case 'playlists':
                 return <PlaylistListView
                     playlists={playlists}
-                    onSelectPlaylist={handleSelectPlaylist}
+                    onSelectPlaylist={(p) => { setActivePlaylist(p); setActiveView('playlistDetail'); }}
                     onCreatePlaylist={(name) => setPlaylists(p => [...p, { id: `pl-${Date.now()}`, name, tracks: [] }])}
                 />;
             case 'playlistDetail':
@@ -317,7 +302,7 @@ const App: React.FC = () => {
                  return <PlaylistDetailView
                     playlist={activePlaylist}
                     onSelectTrack={handleSelectTrack}
-                    onRemoveFromPlaylist={(trackId) => handleRemoveTrackFromPlaylist(activePlaylist.id, trackId)}
+                    onRemoveFromPlaylist={(trackId) => setPlaylists(prev => prev.map(p => p.id === activePlaylist.id ? {...p, tracks: p.tracks.filter(t => t.id.videoId !== trackId)} : p))}
                     onSelectChannel={handleSelectChannel}
                     currentTrackId={currentTrack?.id.videoId}
                     isAutoplayEnabled={isAutoplayEnabled}
@@ -343,11 +328,14 @@ const App: React.FC = () => {
                     offlinePlaylist={offlineItems}
                     syncedOfflineIds={syncedOfflineIds}
                     onSelectTrack={handleSelectTrack}
-                    onRemoveFromOfflinePlaylist={(id) => setOfflineItems(p => p.filter(i => i.id.videoId !== id))}
+                    onRemoveFromOfflinePlaylist={(id) => {
+                        setOfflineItems(p => p.filter(i => i.id.videoId !== id));
+                        setSyncedOfflineIds(p => p.filter(sid => sid !== id));
+                    }}
                     onSelectChannel={handleSelectChannel}
                     currentTrackId={currentTrack?.id.videoId}
                     isSyncing={isSyncing}
-                    onStartSync={() => setIsSyncing(true)}
+                    onStartSync={startOfflineSync}
                     syncingTrackProgress={syncingTrackProgress}
                 />;
             case 'channel':
@@ -356,7 +344,7 @@ const App: React.FC = () => {
                     channelTitle={selectedChannel.title}
                     videos={channelVideos}
                     isLoading={isChannelLoading}
-                    isMoreLoading={isChannelMoreLoading}
+                    isMoreLoading={false}
                     onSelectTrack={handleSelectTrack}
                     onBack={() => setActiveView('home')}
                     onOpenAddToPlaylistModal={handleOpenAddToPlaylistModal}
@@ -397,10 +385,16 @@ const App: React.FC = () => {
                 <Sidebar activeView={activeView} setActiveView={setActiveView} />
 
                 <div className="flex flex-col overflow-hidden bg-dark-highlight">
-                    <div className="flex-shrink-0 pt-6 pb-4 px-2 md:px-4">
-                        <h1 className="container mx-auto text-3xl md:text-4xl font-bold text-white">
+                    <div className="flex-shrink-0 pt-6 pb-4 px-2 md:px-4 flex items-center justify-between">
+                        <h1 className="text-3xl md:text-4xl font-bold text-white">
                             {viewTitles[activeView] || 'YTS'}
                         </h1>
+                        {!navigator.onLine && (
+                            <div className="flex items-center text-yellow-500 text-sm font-semibold bg-yellow-500/10 px-3 py-1 rounded-full border border-yellow-500/20">
+                                <i className="fas fa-wifi-slash mr-2"></i>
+                                Offline
+                            </div>
+                        )}
                     </div>
                     
                     <header className="flex-shrink-0 z-10 p-2 md:p-4">
@@ -425,7 +419,7 @@ const App: React.FC = () => {
                 </div>
                 
                 <Suspense fallback={null}>
-                    {currentTrack && !isMiniPlayerActive && (
+                    {currentTrack && (
                         <footer className="col-span-1 md:col-span-2 z-30">
                             <Player
                                 track={currentTrack}
@@ -440,7 +434,6 @@ const App: React.FC = () => {
                                 duration={duration}
                                 seekTo={seekTo}
                                 onSelectChannel={handleSelectChannel}
-                                onToggleMiniPlayer={() => setIsMiniPlayerActive(p => !p)}
                                 isAutoplayEnabled={isAutoplayEnabled}
                                 onToggleAutoplay={() => setIsAutoplayEnabled(p => !p)}
                             />
@@ -467,7 +460,6 @@ const App: React.FC = () => {
                             onToggleAutoplay={() => setIsAutoplayEnabled(p => !p)}
                             isLiked={likedSongs.includes(currentTrack.id.videoId)}
                             onToggleLike={() => handleToggleLike(currentTrack)}
-                            startInVideoMode={startInVideoMode}
                         >
                             {isAutoplayBlocked && (
                                 <AutoplayOverlay track={currentTrack} onForcePlay={() => setIsPlaying(true)} />

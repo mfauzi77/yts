@@ -14,7 +14,6 @@ interface PlayerProps {
   currentTime: number;
   duration: number;
   seekTo: (seconds: number) => void;
-  onToggleMiniPlayer: () => void;
   isAutoplayEnabled: boolean;
   onToggleAutoplay: () => void;
 }
@@ -29,7 +28,7 @@ const formatTime = (seconds: number) => {
 
 export const Player: React.FC<PlayerProps> = ({
     track, isPlaying, setIsPlaying, onNext, onPrev, onToggleNowPlaying,
-    onSelectChannel, volume, setVolume, currentTime, duration, seekTo, onToggleMiniPlayer,
+    onSelectChannel, volume, setVolume, currentTime, duration, seekTo,
     isAutoplayEnabled, onToggleAutoplay
 }) => {
     
@@ -46,7 +45,7 @@ export const Player: React.FC<PlayerProps> = ({
 
     const handleChannelClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        onToggleNowPlaying(); // Close now playing view first if open
+        onToggleNowPlaying();
         onSelectChannel(track.snippet.channelId, track.snippet.channelTitle);
     };
 
@@ -54,7 +53,7 @@ export const Player: React.FC<PlayerProps> = ({
 
     return (
         <div className="relative bg-dark-surface border-t border-dark-card/50">
-             {/* Mobile-only Progress Bar */}
+             {/* Mobile Progress Bar */}
             <div className="absolute top-0 left-0 right-0 h-0.5 bg-dark-card md:hidden">
                 <div className="bg-brand-red h-full" style={{ width: `${progressPercentage}%` }}></div>
             </div>
@@ -69,7 +68,7 @@ export const Player: React.FC<PlayerProps> = ({
                         onClick={onToggleNowPlaying}
                     />
                     <div className="min-w-0">
-                        <p className="font-semibold text-sm cursor-pointer text-white [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden" onClick={onToggleNowPlaying}>{track.snippet.title}</p>
+                        <p className="font-semibold text-sm cursor-pointer text-white truncate" onClick={onToggleNowPlaying}>{track.snippet.title}</p>
                         <p className="text-xs text-dark-subtext truncate cursor-pointer hover:underline" onClick={handleChannelClick}>
                             {track.snippet.channelTitle}
                         </p>
@@ -92,8 +91,8 @@ export const Player: React.FC<PlayerProps> = ({
                         className="w-14 h-14 rounded-md object-cover cursor-pointer hover:opacity-80 transition-opacity"
                         onClick={onToggleNowPlaying}
                     />
-                    <div>
-                        <p className="font-semibold text-sm cursor-pointer hover:underline [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden" onClick={onToggleNowPlaying}>{track.snippet.title}</p>
+                    <div className="min-w-0">
+                        <p className="font-semibold text-sm cursor-pointer hover:underline truncate" onClick={onToggleNowPlaying}>{track.snippet.title}</p>
                         <p className="text-xs text-dark-subtext cursor-pointer hover:underline" onClick={handleChannelClick}>
                             {track.snippet.channelTitle}
                         </p>
@@ -133,17 +132,8 @@ export const Player: React.FC<PlayerProps> = ({
                         onClick={onToggleAutoplay}
                         title="Alihkan Putar Otomatis"
                         className={`p-2 rounded-full text-dark-subtext hover:bg-dark-card hover:text-white transition-colors ${isAutoplayEnabled ? 'text-brand-red' : ''}`}
-                        aria-label="Alihkan Putar Otomatis"
                     >
                         <i className="fas fa-redo-alt"></i>
-                    </button>
-                    <button 
-                        onClick={onToggleMiniPlayer} 
-                        title="Pemutar mini" 
-                        className="p-2 rounded-full text-dark-subtext hover:bg-dark-card hover:text-white transition-colors"
-                        aria-label="Alihkan pemutar mini"
-                    >
-                        <i className="far fa-window-minimize"></i>
                     </button>
                     <div className="flex items-center space-x-2 w-32">
                         <i className={`fas ${volume === 0 ? 'fa-volume-mute' : 'fa-volume-down'} text-dark-subtext`}></i>

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { searchVideos } from '../services/youtubeService';
 import type { VideoItem } from '../types';
@@ -12,7 +11,7 @@ interface VideoFeedProps {
   currentTrackId?: string | null;
 }
 
-const VideoCard: React.FC<{
+const MusicCard: React.FC<{
     item: VideoItem;
     onSelectTrack: () => void;
     onOpenAddToPlaylistModal: () => void;
@@ -22,8 +21,7 @@ const VideoCard: React.FC<{
     isPlaying: boolean;
 }> = ({ item, onSelectTrack, onOpenAddToPlaylistModal, onSelectChannel, isOffline, onAddToOffline, isPlaying }) => (
     <div className="group relative bg-dark-card rounded-lg overflow-hidden hover:bg-dark-surface transition-all duration-300 hover:shadow-xl">
-        {/* Thumbnail */}
-        <div className="aspect-video relative cursor-pointer" onClick={onSelectTrack}>
+        <div className="aspect-square relative cursor-pointer" onClick={onSelectTrack}>
             <img
                 src={item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default.url}
                 alt={item.snippet.title}
@@ -35,17 +33,13 @@ const VideoCard: React.FC<{
                     <i className="fas fa-play text-white ml-1"></i>
                  </div>
             </div>
-            <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded">
-                 Video
-            </div>
         </div>
 
-        {/* Info */}
         <div className="p-3">
             <div className="flex justify-between items-start gap-2">
                 <div className="min-w-0 flex-1">
                     <h3 
-                        className={`font-semibold text-sm md:text-base line-clamp-2 cursor-pointer ${isPlaying ? 'text-brand-red' : 'text-white'}`}
+                        className={`font-semibold text-sm line-clamp-2 cursor-pointer ${isPlaying ? 'text-brand-red' : 'text-white'}`}
                         onClick={onSelectTrack}
                     >
                         {item.snippet.title}
@@ -56,23 +50,18 @@ const VideoCard: React.FC<{
                     >
                         {item.snippet.channelTitle}
                     </p>
-                    <p className="text-xs text-dark-subtext/70 mt-0.5">
-                         {new Date(item.snippet.publishedAt).toLocaleDateString()}
-                    </p>
                 </div>
                 
                 <div className="flex flex-col gap-1">
                     <button
                         onClick={(e) => { e.stopPropagation(); onOpenAddToPlaylistModal(); }}
                         className="p-1.5 rounded-full text-dark-subtext hover:text-white hover:bg-white/10 transition-colors"
-                        title="Tambahkan ke playlist"
                     >
                         <i className="fas fa-plus"></i>
                     </button>
                      <button
                         onClick={(e) => { e.stopPropagation(); onAddToOffline(); }}
                         className={`p-1.5 rounded-full transition-colors ${isOffline ? 'text-green-500' : 'text-dark-subtext hover:text-white hover:bg-white/10'}`}
-                        title={isOffline ? "Tersedia Offline" : "Simpan Offline"}
                     >
                         <i className={`fas ${isOffline ? 'fa-check-circle' : 'fa-cloud-download-alt'}`}></i>
                     </button>
@@ -98,13 +87,11 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
         const fetchVideos = async () => {
             setIsLoading(true);
             try {
-                // Fetch popular music videos
-                const results = await searchVideos('official music video');
-                // Shuffle slightly for variety
+                const results = await searchVideos('official audio music');
                 setVideos(results.sort(() => 0.5 - Math.random()));
             } catch (err) {
-                console.error("Failed to fetch video feed", err);
-                setError("Gagal memuat feed video.");
+                console.error("Failed to fetch music feed", err);
+                setError("Gagal memuat daftar musik.");
             } finally {
                 setIsLoading(false);
             }
@@ -133,13 +120,13 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
     return (
         <div>
             <div className="mb-4 flex items-center gap-2 text-dark-subtext">
-                <i className="fas fa-fire text-brand-red"></i>
-                <span className="font-semibold text-sm uppercase tracking-wider">Trending Video Musik</span>
+                <i className="fas fa-music text-brand-red"></i>
+                <span className="font-semibold text-sm uppercase tracking-wider">Lagu Populer</span>
             </div>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {videos.map(item => (
-                    <VideoCard
+                    <MusicCard
                         key={item.id.videoId}
                         item={item}
                         onSelectTrack={() => onSelectTrack(item, videos)}
@@ -150,9 +137,6 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
                         isPlaying={currentTrackId === item.id.videoId}
                     />
                 ))}
-            </div>
-             <div className="text-center mt-8 mb-4">
-                <p className="text-sm text-dark-subtext">Daftar ini diperbarui secara otomatis.</p>
             </div>
         </div>
     );
