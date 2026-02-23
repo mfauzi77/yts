@@ -23,7 +23,7 @@ const MusicCard: React.FC<{
     <div className="group relative bg-dark-card rounded-lg overflow-hidden hover:bg-dark-surface transition-all duration-300 hover:shadow-xl">
         <div className="aspect-square relative cursor-pointer" onClick={onSelectTrack}>
             <img
-                src={item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default.url}
+                src={item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default.url}
                 alt={item.snippet.title}
                 className="w-full h-full object-cover"
             />

@@ -58,6 +58,7 @@ export const useYouTubePlayer = ({ videoId, isPlaying, onStateChange }: UseYouTu
                     'enablejsapi': 1,
                     'rel': 0,
                     'iv_load_policy': 3, // Hide annotations
+                    'vq': 'tiny', // Unofficial but often respected quality hint
                 },
                 events: {
                     'onReady': () => {
@@ -90,7 +91,10 @@ export const useYouTubePlayer = ({ videoId, isPlaying, onStateChange }: UseYouTu
 
     useEffect(() => {
         if (isReady && videoId) {
-            playerRef.current?.loadVideoById(videoId);
+            playerRef.current?.loadVideoById({
+                videoId: videoId,
+                suggestedQuality: 'small'
+            });
         }
     }, [isReady, videoId]);
     

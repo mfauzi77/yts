@@ -94,7 +94,7 @@ const App: React.FC = () => {
         for (const item of unsyncedItems) {
             try {
                 // 1. Trigger Thumbnail Cache melalui fetch (Service Worker akan menangkapnya)
-                const imgUrl = item.snippet.thumbnails.high?.url || item.snippet.thumbnails.default.url;
+                const imgUrl = item.snippet.thumbnails.default.url;
                 await fetch(imgUrl, { mode: 'no-cors' });
                 
                 // 2. Tandai sebagai tersinkronisasi

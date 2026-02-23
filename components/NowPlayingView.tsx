@@ -47,7 +47,7 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
     const [showVisualEffect, setShowVisualEffect] = useState(false);
     const [viewMode, setViewMode] = useState<'album' | 'lyrics'>('album');
     
-    const imageUrl = track.snippet.thumbnails.high?.url || track.snippet.thumbnails.default.url;
+    const imageUrl = track.snippet.thumbnails.medium?.url || track.snippet.thumbnails.default.url;
 
     useEffect(() => {
         if (!isOpen) {
@@ -97,6 +97,11 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
                 
                 {/* Album Art / Lyrics Container */}
                 <div className="relative z-20 transition-all duration-300 ease-in-out shadow-2xl w-full max-w-[350px] md:max-w-lg mx-auto aspect-square max-h-[50vh] md:max-h-[60vh] mb-8">
+                    {/* Data Saver Badge */}
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-lg">
+                        <i className="fas fa-leaf"></i>
+                        PENGHEMAT DATA AKTIF
+                    </div>
                    <Suspense fallback={<ViewPlaceholder />}>
                         {viewMode === 'lyrics' ? (
                             <LyricsView track={track} />

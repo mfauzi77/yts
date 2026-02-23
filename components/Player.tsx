@@ -128,6 +128,10 @@ export const Player: React.FC<PlayerProps> = ({
 
                 {/* Right: Volume & Options */}
                 <div className="flex items-center space-x-4 justify-end">
+                    <div className="hidden lg:flex items-center gap-1.5 px-2 py-1 bg-green-900/30 border border-green-500/30 rounded text-[10px] text-green-400 font-bold">
+                        <i className="fas fa-leaf"></i>
+                        DATA SAVER
+                    </div>
                     <button
                         onClick={onToggleAutoplay}
                         title="Alihkan Putar Otomatis"
