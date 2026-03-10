@@ -67,11 +67,12 @@ const App: React.FC = () => {
     const [isAutoplayEnabled, setIsAutoplayEnabled] = useLocalStorage<boolean>('ytas-autoplay', true);
     const [likedSongs, setLikedSongs] = useLocalStorage<string[]>('ytas-liked-songs', []);
     
-    const [activePlaylist, setActivePlaylist] = useState<Playlist | null>(null);
+    const [activePlaylistId, setActivePlaylistId] = useState<string | null>(null);
     const [modalTrack, setModalTrack] = useState<VideoItem | null>(null);
 
-    const [activePlaybackList, setActivePlaybackList] = useState<VideoItem[]>([]);
-    const currentTrackIndexRef = React.useRef(-1);
+    const activePlaylist = playlists.find(p => p.id === activePlaylistId) || null;
+    const activePlaybackList = useRef<VideoItem[]>([]);
+    const currentTrackIndexRef = useRef(-1);
     
     const [isSyncing, setIsSyncing] = useState(false);
     const [syncingTrackProgress, setSyncingTrackProgress] = useState<number>(0);
@@ -163,11 +164,25 @@ const App: React.FC = () => {
             if (history.length > 0) {
                 setIsRecommendationsLoading(true);
                 try {
-                    const results = await getRelatedVideos(history[0].id.videoId);
-                    setRecommendations(results.filter(v => v.id.videoId !== history[0].id.videoId));
+                    // Coba ambil rekomendasi dari 3 item riwayat terakhir jika yang pertama gagal
+                    let results: VideoItem[] = [];
+                    for (let i = 0; i < Math.min(history.length, 3); i++) {
+                        const related = await getRelatedVideos(history[i].id.videoId);
+                        if (related.length > 0) {
+                            results = related.filter(v => !history.some(h => h.id.videoId === v.id.videoId));
+                            if (results.length > 0) break;
+                        }
+                    }
+                    
+                    // Jika masih kosong, coba cari video populer atau acak (opsional, di sini kita biarkan kosong jika benar-benar tidak ada)
+                    setRecommendations(results);
                     setApiStatus('success');
-                } catch (err) { handleApiError(err); } 
-                finally { setIsRecommendationsLoading(false); }
+                } catch (err) { 
+                    console.error("Gagal mengambil rekomendasi:", err);
+                    setRecommendations([]);
+                } finally { 
+                    setIsRecommendationsLoading(false); 
+                }
             } else {
                 setRecommendations([]);
                 setIsRecommendationsLoading(false);
@@ -214,7 +229,7 @@ const App: React.FC = () => {
             setSyncedOfflineIds(prev => [...new Set([...prev, track.id.videoId])]);
         }
 
-        setActivePlaybackList(contextList);
+        activePlaybackList.current = contextList;
         currentTrackIndexRef.current = contextList.findIndex(item => item.id.videoId === track.id.videoId);
         
         if (window.innerWidth < 768) {
@@ -223,16 +238,16 @@ const App: React.FC = () => {
     }, [addToHistory, offlineItems, setSyncedOfflineIds]);
 
     const playNext = useCallback(() => {
-        if (activePlaybackList.length === 0) return;
-        currentTrackIndexRef.current = (currentTrackIndexRef.current + 1) % activePlaybackList.length;
-        handleSelectTrack(activePlaybackList[currentTrackIndexRef.current], activePlaybackList);
-    }, [activePlaybackList, handleSelectTrack]);
+        if (activePlaybackList.current.length === 0) return;
+        currentTrackIndexRef.current = (currentTrackIndexRef.current + 1) % activePlaybackList.current.length;
+        handleSelectTrack(activePlaybackList.current[currentTrackIndexRef.current], activePlaybackList.current);
+    }, [handleSelectTrack]);
 
     const playPrev = useCallback(() => {
-        if (activePlaybackList.length === 0) return;
-        currentTrackIndexRef.current = (currentTrackIndexRef.current - 1 + activePlaybackList.length) % activePlaybackList.length;
-        handleSelectTrack(activePlaybackList[currentTrackIndexRef.current], activePlaybackList);
-    }, [activePlaybackList, handleSelectTrack]);
+        if (activePlaybackList.current.length === 0) return;
+        currentTrackIndexRef.current = (currentTrackIndexRef.current - 1 + activePlaybackList.current.length) % activePlaybackList.current.length;
+        handleSelectTrack(activePlaybackList.current[currentTrackIndexRef.current], activePlaybackList.current);
+    }, [handleSelectTrack]);
 
     const handlePlayerStateChange = useCallback((event: { data: number }) => {
         if (event.data === 1) {
@@ -347,11 +362,25 @@ const App: React.FC = () => {
             case 'playlists':
                 return <PlaylistListView
                     playlists={playlists}
-                    onSelectPlaylist={(p) => { setActivePlaylist(p); setActiveView('playlistDetail'); }}
+                    onSelectPlaylist={(p) => { setActivePlaylistId(p.id); setActiveView('playlistDetail'); }}
                     onCreatePlaylist={(name) => setPlaylists(p => [...p, { id: `pl-${Date.now()}`, name, tracks: [] }])}
                 />;
             case 'playlistDetail':
-                 if (!activePlaylist) return null;
+                 if (!activePlaylist) {
+                     return (
+                         <div className="text-center py-20 text-dark-subtext bg-dark-surface/30 rounded-xl border border-dark-card/50">
+                             <i className="fas fa-exclamation-circle text-5xl mb-4 text-brand-red/50"></i>
+                             <p className="text-xl font-bold text-white">Playlist Tidak Ditemukan</p>
+                             <p className="mt-2">Playlist yang Anda cari mungkin telah dihapus atau tidak ada.</p>
+                             <button 
+                                onClick={() => setActiveView('playlists')} 
+                                className="mt-6 px-6 py-2 bg-brand-red text-white rounded-full hover:bg-red-700 transition-colors"
+                             >
+                                Kembali ke Daftar Playlist
+                             </button>
+                         </div>
+                     );
+                 }
                  return <PlaylistDetailView
                     playlist={activePlaylist}
                     onSelectTrack={handleSelectTrack}
@@ -410,7 +439,21 @@ const App: React.FC = () => {
                     hasNextPage={!!channelNextPageToken}
                 />;
             case 'youtubePlaylistDetail':
-                if (!selectedYouTubePlaylist) return null;
+                if (!selectedYouTubePlaylist) {
+                    return (
+                        <div className="text-center py-20 text-dark-subtext bg-dark-surface/30 rounded-xl border border-dark-card/50">
+                            <i className="fas fa-exclamation-circle text-5xl mb-4 text-brand-red/50"></i>
+                            <p className="text-xl font-bold text-white">Playlist YouTube Tidak Ditemukan</p>
+                            <button 
+                               onClick={() => setActiveView('home')} 
+                               className="mt-6 px-6 py-2 bg-brand-red text-white rounded-full hover:bg-red-700 transition-colors"
+                            >
+                               Kembali ke Beranda
+                            </button>
+                        </div>
+                    );
+                }
+                if (isYoutubePlaylistLoading && youtubePlaylistVideos.length === 0) return <LoadingSpinner />;
                 return <PlaylistDetailView
                     playlist={{
                         id: selectedYouTubePlaylist.id,

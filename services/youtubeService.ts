@@ -151,14 +151,18 @@ export const getPlaylistItems = async (playlistId: string, maxResults = 50, page
                 videoId: item.snippet.resourceId.videoId,
             },
             snippet: {
-                publishedAt: item.snippet.publishedAt,
-                channelId: item.snippet.channelId,
-                title: item.snippet.title,
-                description: item.snippet.description,
-                thumbnails: item.snippet.thumbnails,
-                channelTitle: item.snippet.channelTitle,
+                publishedAt: item.snippet.publishedAt || new Date().toISOString(),
+                channelId: item.snippet.channelId || '',
+                title: item.snippet.title || 'Unknown Title',
+                description: item.snippet.description || '',
+                thumbnails: item.snippet.thumbnails || {
+                    default: { url: 'https://picsum.photos/seed/music/200/200', width: 120, height: 90 },
+                    medium: { url: 'https://picsum.photos/seed/music/200/200', width: 320, height: 180 },
+                    high: { url: 'https://picsum.photos/seed/music/200/200', width: 480, height: 360 }
+                },
+                channelTitle: item.snippet.channelTitle || 'Unknown Channel',
                 liveBroadcastContent: 'none',
-                publishTime: item.snippet.publishedAt,
+                publishTime: item.snippet.publishedAt || new Date().toISOString(),
             }
         }));
 
