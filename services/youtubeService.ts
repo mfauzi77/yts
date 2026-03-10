@@ -1,5 +1,5 @@
 
-import type { VideoItem } from '../types';
+import type { VideoItem, YouTubePlaylist } from '../types';
 
 const BASE_URL = 'https://www.googleapis.com/youtube/v3';
 
@@ -129,7 +129,7 @@ const getChannelUploadsPlaylistId = async (channelId: string): Promise<string | 
     return data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads || null;
 };
 
-const getPlaylistItems = async (playlistId: string, maxResults = 50, pageToken?: string): Promise<ApiResponse> => {
+export const getPlaylistItems = async (playlistId: string, maxResults = 50, pageToken?: string): Promise<ApiResponse> => {
     const params = new URLSearchParams({
         part: 'snippet',
         playlistId: playlistId,
@@ -144,20 +144,46 @@ const getPlaylistItems = async (playlistId: string, maxResults = 50, pageToken?:
     const items: VideoItem[] = (data.items || [])
         .filter(item => item.snippet?.resourceId?.videoId)
         .map(item => ({
-            kind: 'youtube#searchResult', // Mocking the structure
-            etag: '', // Not provided in playlistItems
+            kind: 'youtube#searchResult',
+            etag: '',
             id: {
                 kind: 'youtube#video',
                 videoId: item.snippet.resourceId.videoId,
             },
             snippet: {
-                ...item.snippet,
-                liveBroadcastContent: 'none', // Not provided, default to none
+                publishedAt: item.snippet.publishedAt,
+                channelId: item.snippet.channelId,
+                title: item.snippet.title,
+                description: item.snippet.description,
+                thumbnails: item.snippet.thumbnails,
+                channelTitle: item.snippet.channelTitle,
+                liveBroadcastContent: 'none',
                 publishTime: item.snippet.publishedAt,
             }
         }));
 
     return { items, nextPageToken: data.nextPageToken };
+};
+
+export const getChannelPlaylists = async (channelId: string, maxResults = 50, pageToken?: string): Promise<{ items: YouTubePlaylist[], nextPageToken?: string }> => {
+    if (typeof channelId !== 'string' || !channelId.trim()) {
+        console.warn('getChannelPlaylists called with an invalid channelId:', channelId);
+        return { items: [], nextPageToken: undefined };
+    }
+
+    const params = new URLSearchParams({
+        part: 'snippet,contentDetails',
+        channelId: channelId,
+        maxResults: String(maxResults),
+    });
+    if (pageToken) {
+        params.set('pageToken', pageToken);
+    }
+    const data = await fetchFromApiCore('/playlists', params);
+    return { 
+        items: data.items || [], 
+        nextPageToken: data.nextPageToken 
+    };
 };
 
 export const getChannelVideos = async (channelId: string, _order: 'date' | 'viewCount' = 'date', maxResults = 50, pageToken?: string): Promise<ApiResponse> => {

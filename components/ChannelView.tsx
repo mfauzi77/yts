@@ -1,13 +1,15 @@
 
-import React from 'react';
-import type { VideoItem } from '../types';
+import React, { useState } from 'react';
+import type { VideoItem, YouTubePlaylist } from '../types';
 
 interface ChannelViewProps {
   channelTitle: string;
   videos: VideoItem[];
+  playlists: YouTubePlaylist[];
   isLoading: boolean;
   isMoreLoading: boolean;
   onSelectTrack: (track: VideoItem, contextList: VideoItem[]) => void;
+  onSelectPlaylist: (playlist: YouTubePlaylist) => void;
   onBack: () => void;
   onOpenAddToPlaylistModal: (track: VideoItem) => void;
   onAddToOffline: (track: VideoItem) => void;
@@ -71,12 +73,46 @@ const ChannelVideoItem: React.FC<{
     </div>
 );
 
+const ChannelPlaylistItem: React.FC<{
+    playlist: YouTubePlaylist;
+    onSelectPlaylist: (playlist: YouTubePlaylist) => void;
+}> = ({ playlist, onSelectPlaylist }) => (
+    <div 
+        onClick={() => onSelectPlaylist(playlist)}
+        className="grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group cursor-pointer"
+    >
+        <div className="relative w-12 h-12">
+            <img
+                src={playlist.snippet.thumbnails.default.url}
+                alt={playlist.snippet.title}
+                className="w-full h-full rounded-md object-cover"
+            />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-md">
+                <i className="fas fa-list text-white text-xs"></i>
+            </div>
+        </div>
+        <div className="min-w-0">
+            <p className="text-sm font-semibold text-white truncate">
+                {playlist.snippet.title}
+            </p>
+            <p className="text-xs text-dark-subtext">
+                {playlist.contentDetails.itemCount} lagu
+            </p>
+        </div>
+        <div className="text-dark-subtext">
+            <i className="fas fa-chevron-right"></i>
+        </div>
+    </div>
+);
+
 export const ChannelView: React.FC<ChannelViewProps> = ({ 
     channelTitle, 
     videos, 
+    playlists,
     isLoading, 
     isMoreLoading,
     onSelectTrack, 
+    onSelectPlaylist,
     onBack,
     onOpenAddToPlaylistModal,
     onAddToOffline,
@@ -85,6 +121,8 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
     onLoadMore,
     hasNextPage,
 }) => {
+    const [activeTab, setActiveTab] = useState<'videos' | 'playlists'>('videos');
+
     return (
         <>
             <div className="flex-shrink-0 pt-6 pb-4 px-2 md:px-0 flex items-center">
@@ -96,42 +134,78 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                 </h1>
             </div>
 
+            <div className="flex border-b border-dark-card mb-4">
+                <button 
+                    onClick={() => setActiveTab('videos')}
+                    className={`px-4 py-2 text-sm font-semibold transition-colors ${activeTab === 'videos' ? 'text-brand-red border-b-2 border-brand-red' : 'text-dark-subtext hover:text-white'}`}
+                >
+                    Video
+                </button>
+                <button 
+                    onClick={() => setActiveTab('playlists')}
+                    className={`px-4 py-2 text-sm font-semibold transition-colors ${activeTab === 'playlists' ? 'text-brand-red border-b-2 border-brand-red' : 'text-dark-subtext hover:text-white'}`}
+                >
+                    Playlist
+                </button>
+            </div>
+
             {isLoading ? (
                  <div className="flex justify-center items-center h-64">
                     <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-brand-red"></div>
                 </div>
             ) : (
                 <div className="mt-4 space-y-2">
-                   {videos.map(item => (
-                       <ChannelVideoItem
-                            key={item.id.videoId}
-                            item={item}
-                            onSelectTrack={onSelectTrack}
-                            onOpenAddToPlaylistModal={onOpenAddToPlaylistModal}
-                            isOffline={offlineItems.some(o => o.id.videoId === item.id.videoId)}
-                            onAddToOffline={onAddToOffline}
-                            isPlaying={currentTrackId === item.id.videoId}
-                            videoList={videos}
-                       />
-                   ))}
-                   
-                   {hasNextPage && (
-                       <div className="flex justify-center py-6">
-                           <button
-                               onClick={onLoadMore}
-                               disabled={isMoreLoading}
-                               className="px-6 py-2 bg-dark-card text-white font-semibold rounded-full hover:bg-dark-surface focus:outline-none focus:ring-2 focus:ring-brand-red/50 transition-colors disabled:opacity-50 disabled:cursor-wait"
-                           >
-                               {isMoreLoading ? (
-                                   <>
-                                       <i className="fas fa-spinner fa-spin mr-2"></i>
-                                       Memuat...
-                                   </>
-                               ) : (
-                                   'Muat Lebih Banyak'
-                               )}
-                           </button>
-                       </div>
+                   {activeTab === 'videos' ? (
+                       <>
+                           {videos.map(item => (
+                               <ChannelVideoItem
+                                    key={item.id.videoId}
+                                    item={item}
+                                    onSelectTrack={onSelectTrack}
+                                    onOpenAddToPlaylistModal={onOpenAddToPlaylistModal}
+                                    isOffline={offlineItems.some(o => o.id.videoId === item.id.videoId)}
+                                    onAddToOffline={onAddToOffline}
+                                    isPlaying={currentTrackId === item.id.videoId}
+                                    videoList={videos}
+                               />
+                           ))}
+                           
+                           {hasNextPage && (
+                               <div className="flex justify-center py-6">
+                                   <button
+                                       onClick={onLoadMore}
+                                       disabled={isMoreLoading}
+                                       className="px-6 py-2 bg-dark-card text-white font-semibold rounded-full hover:bg-dark-surface focus:outline-none focus:ring-2 focus:ring-brand-red/50 transition-colors disabled:opacity-50 disabled:cursor-wait"
+                                   >
+                                       {isMoreLoading ? (
+                                           <>
+                                               <i className="fas fa-spinner fa-spin mr-2"></i>
+                                               Memuat...
+                                           </>
+                                       ) : (
+                                           'Muat Lebih Banyak'
+                                       )}
+                                   </button>
+                               </div>
+                           )}
+                       </>
+                   ) : (
+                       <>
+                           {playlists.length > 0 ? (
+                               playlists.map(playlist => (
+                                   <ChannelPlaylistItem 
+                                        key={playlist.id}
+                                        playlist={playlist}
+                                        onSelectPlaylist={onSelectPlaylist}
+                                   />
+                               ))
+                           ) : (
+                               <div className="text-center py-10 text-dark-subtext">
+                                   <i className="fas fa-list-ul text-4xl mb-4"></i>
+                                   <p>Channel ini tidak memiliki playlist publik.</p>
+                               </div>
+                           )}
+                       </>
                    )}
                 </div>
             )}

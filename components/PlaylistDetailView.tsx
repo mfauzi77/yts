@@ -15,6 +15,7 @@ interface PlaylistDetailViewProps {
   onBack: () => void;
   onDelete: () => void;
   onRename: (newName: string) => void;
+  isYouTubePlaylist?: boolean;
 }
 
 const PlaylistItem: React.FC<{
@@ -27,7 +28,8 @@ const PlaylistItem: React.FC<{
     isOffline: boolean;
     onAddToOffline: (track: VideoItem) => void;
     playlistTracks: VideoItem[];
-}> = ({ item, index, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, isPlaying, isOffline, onAddToOffline, playlistTracks }) => (
+    isYouTubePlaylist?: boolean;
+}> = ({ item, index, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, isPlaying, isOffline, onAddToOffline, playlistTracks, isYouTubePlaylist }) => (
     <div className="grid grid-cols-[20px_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
         <div className="flex items-center justify-center text-dark-subtext">
             <span className="group-hover:hidden">{index + 1}</span>
@@ -64,9 +66,11 @@ const PlaylistItem: React.FC<{
             >
                 <i className={`fas ${isOffline ? 'fa-check-circle' : 'fa-cloud-download-alt'}`}></i>
             </button>
-            <button onClick={() => onRemoveFromPlaylist(item.id.videoId)} className="p-2 w-10 rounded-full text-dark-subtext hover:text-white" title="Hapus dari playlist">
-                <i className="fas fa-trash-alt"></i>
-            </button>
+            {!isYouTubePlaylist && (
+                <button onClick={() => onRemoveFromPlaylist(item.id.videoId)} className="p-2 w-10 rounded-full text-dark-subtext hover:text-white" title="Hapus dari playlist">
+                    <i className="fas fa-trash-alt"></i>
+                </button>
+            )}
         </div>
     </div>
 );
@@ -76,7 +80,8 @@ const PlaylistHeader: React.FC<{
     onBack: () => void;
     onDelete: () => void;
     onRename: (newName: string) => void;
-}> = ({ playlist, onBack, onDelete, onRename }) => {
+    isYouTubePlaylist?: boolean;
+}> = ({ playlist, onBack, onDelete, onRename, isYouTubePlaylist }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [title, setTitle] = useState(playlist.name);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -115,7 +120,7 @@ const PlaylistHeader: React.FC<{
                 <button onClick={onBack} className="p-2 mr-2 -ml-2 rounded-full hover:bg-dark-surface">
                     <i className="fas fa-arrow-left text-white"></i>
                 </button>
-                {isEditing ? (
+                {isEditing && !isYouTubePlaylist ? (
                     <input
                         ref={inputRef}
                         type="text"
@@ -126,30 +131,35 @@ const PlaylistHeader: React.FC<{
                         className="text-3xl md:text-4xl font-bold text-white bg-transparent border-b-2 border-brand-red outline-none"
                     />
                 ) : (
-                    <h1 className="text-3xl md:text-4xl font-bold text-white truncate cursor-pointer" onClick={() => setIsEditing(true)}>
+                    <h1 
+                        className={`text-3xl md:text-4xl font-bold text-white truncate ${!isYouTubePlaylist ? 'cursor-pointer' : ''}`} 
+                        onClick={() => !isYouTubePlaylist && setIsEditing(true)}
+                    >
                         {playlist.name}
                     </h1>
                 )}
             </div>
-            <button onClick={onDelete} className="p-2 rounded-full text-dark-subtext hover:text-brand-red hover:bg-dark-surface" title="Hapus playlist">
-                <i className="fas fa-trash-alt"></i>
-            </button>
+            {!isYouTubePlaylist && (
+                <button onClick={onDelete} className="p-2 rounded-full text-dark-subtext hover:text-brand-red hover:bg-dark-surface" title="Hapus playlist">
+                    <i className="fas fa-trash-alt"></i>
+                </button>
+            )}
         </div>
     );
 };
 
 
-export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, currentTrackId, isAutoplayEnabled, onToggleAutoplay, offlineItems, onAddToOffline, onBack, onDelete, onRename }) => {
+export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, currentTrackId, isAutoplayEnabled, onToggleAutoplay, offlineItems, onAddToOffline, onBack, onDelete, onRename, isYouTubePlaylist }) => {
   if (!playlist) return null;
 
   if (playlist.tracks.length === 0) {
     return (
       <>
-        <PlaylistHeader playlist={playlist} onBack={onBack} onDelete={onDelete} onRename={onRename} />
+        <PlaylistHeader playlist={playlist} onBack={onBack} onDelete={onDelete} onRename={onRename} isYouTubePlaylist={isYouTubePlaylist} />
         <div className="text-center py-10 text-dark-subtext">
             <i className="fas fa-list-ul text-4xl mb-4"></i>
             <p>Playlist ini kosong.</p>
-            <p className="text-sm">Tambahkan lagu dari hasil pencarian untuk memulai.</p>
+            {!isYouTubePlaylist && <p className="text-sm">Tambahkan lagu dari hasil pencarian untuk memulai.</p>}
         </div>
       </>
     );
@@ -157,7 +167,7 @@ export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist
 
   return (
     <div>
-        <PlaylistHeader playlist={playlist} onBack={onBack} onDelete={onDelete} onRename={onRename} />
+        <PlaylistHeader playlist={playlist} onBack={onBack} onDelete={onDelete} onRename={onRename} isYouTubePlaylist={isYouTubePlaylist} />
         <div className="flex items-center justify-end mb-4 pr-2">
             <div className="flex items-center">
                 <span className="mr-3 text-sm font-medium text-dark-subtext">Putar Otomatis</span>
@@ -182,6 +192,7 @@ export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist
                     isOffline={isOffline}
                     onAddToOffline={onAddToOffline}
                     playlistTracks={playlist.tracks}
+                    isYouTubePlaylist={isYouTubePlaylist}
                 />
             )
           })}

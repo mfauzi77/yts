@@ -1,9 +1,9 @@
 
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 import { SearchBar } from './components/SearchBar';
-import { getChannelVideos, getRelatedVideos, searchVideos } from './services/youtubeService';
+import { getChannelVideos, getRelatedVideos, searchVideos, getChannelPlaylists, getPlaylistItems } from './services/youtubeService';
 import { useLocalStorage } from './hooks/useLocalStorage';
-import type { VideoItem, Playlist } from './types';
+import type { VideoItem, Playlist, YouTubePlaylist } from './types';
 import { useYouTubePlayer } from './hooks/useYouTubePlayer';
 import { ApiStatusIndicator } from './components/ApiStatusIndicator';
 import { LandingPage } from './components/LandingPage';
@@ -24,7 +24,7 @@ const AddToPlaylistModal = lazy(() => import('./components/AddToPlaylistModal').
 const PlaylistDetailView = lazy(() => import('./components/PlaylistDetailView').then(m => ({ default: m.PlaylistDetailView })));
 const LiteView = lazy(() => import('./components/LiteView').then(m => ({ default: m.LiteView })));
 
-type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'offline' | 'channel' | 'lite';
+type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'offline' | 'channel' | 'lite' | 'youtubePlaylistDetail';
 type ApiStatus = 'idle' | 'success' | 'error';
 
 const LoadingSpinner: React.FC = () => (
@@ -47,8 +47,14 @@ const App: React.FC = () => {
     const [activeView, setActiveView] = useState<MainView>('home');
     const [selectedChannel, setSelectedChannel] = useState<{ id: string; title: string } | null>(null);
     const [channelVideos, setChannelVideos] = useState<VideoItem[]>([]);
+    const [channelPlaylists, setChannelPlaylists] = useState<YouTubePlaylist[]>([]);
     const [isChannelLoading, setIsChannelLoading] = useState<boolean>(false);
     const [channelNextPageToken, setChannelNextPageToken] = useState<string | undefined>(undefined);
+    
+    const [selectedYouTubePlaylist, setSelectedYouTubePlaylist] = useState<YouTubePlaylist | null>(null);
+    const [youtubePlaylistVideos, setYoutubePlaylistVideos] = useState<VideoItem[]>([]);
+    const [isYoutubePlaylistLoading, setIsYoutubePlaylistLoading] = useState<boolean>(false);
+
     const [apiStatus, setApiStatus] = useState<ApiStatus>('idle');
     const [isAppEntered, setIsAppEntered] = useState<boolean>(false);
     const [isLandingPageMounted, setIsLandingPageMounted] = useState<boolean>(true);
@@ -76,6 +82,25 @@ const App: React.FC = () => {
         setApiStatus('error');
     };
 
+    const getBase64FromUrl = async (url: string): Promise<string> => {
+        try {
+            const response = await fetch(url, { mode: 'cors' });
+            if (!response.ok) throw new Error('Failed to fetch image');
+            const blob = await response.blob();
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        } catch (err) {
+            // Fallback to no-cors if cors fails, but we won't get base64
+            // This is just to ensure the service worker at least tries to cache it
+            await fetch(url, { mode: 'no-cors' });
+            throw err;
+        }
+    };
+
     // Logic Sinkronisasi Offline yang diperbarui
     const startOfflineSync = useCallback(async () => {
         if (isSyncing || offlineItems.length === 0) return;
@@ -91,28 +116,38 @@ const App: React.FC = () => {
         }
 
         let completed = 0;
+
         for (const item of unsyncedItems) {
             try {
-                // 1. Trigger Thumbnail Cache melalui fetch (Service Worker akan menangkapnya)
+                // 1. Ambil Base64 Thumbnail
                 const imgUrl = item.snippet.thumbnails.default.url;
-                await fetch(imgUrl, { mode: 'no-cors' });
+                const base64 = await getBase64FromUrl(imgUrl);
                 
-                // 2. Tandai sebagai tersinkronisasi
+                // 2. Update item dengan data thumbnail secara atomik
+                setOfflineItems(prev => prev.map(i => 
+                    i.id.videoId === item.id.videoId 
+                        ? { ...i, snippet: { ...i.snippet, thumbnailData: base64 } } 
+                        : i
+                ));
+
+                // 3. Tandai sebagai tersinkronisasi
                 setSyncedOfflineIds(prev => [...new Set([...prev, item.id.videoId])]);
                 
                 completed++;
                 setSyncingTrackProgress((completed / unsyncedItems.length) * 100);
                 
                 // Jeda kecil agar tidak memberatkan browser
-                await new Promise(r => setTimeout(r, 500));
+                await new Promise(r => setTimeout(r, 300));
             } catch (err) {
-                console.error("Gagal sinkronisasi item:", item.snippet.title);
+                console.error("Gagal sinkronisasi item:", item.snippet.title, err);
+                // Jika gagal base64, kita tetap tandai synced agar tidak loop terus
+                setSyncedOfflineIds(prev => [...new Set([...prev, item.id.videoId])]);
             }
         }
         
         setIsSyncing(false);
         setSyncingTrackProgress(100);
-    }, [isSyncing, offlineItems, syncedOfflineIds, setSyncedOfflineIds]);
+    }, [isSyncing, offlineItems, syncedOfflineIds, setSyncedOfflineIds, setOfflineItems]);
 
     useEffect(() => {
         if (apiStatus === 'success' || apiStatus === 'error') {
@@ -253,13 +288,31 @@ const App: React.FC = () => {
         setSelectedChannel({ id: channelId, title: channelTitle });
         setActiveView('channel');
         setChannelVideos([]);
+        setChannelPlaylists([]);
         try {
-            const { items, nextPageToken } = await getChannelVideos(channelId);
-            setChannelVideos(items);
-            setChannelNextPageToken(nextPageToken);
+            const [videoData, playlistData] = await Promise.all([
+                getChannelVideos(channelId),
+                getChannelPlaylists(channelId)
+            ]);
+            setChannelVideos(videoData.items);
+            setChannelNextPageToken(videoData.nextPageToken);
+            setChannelPlaylists(playlistData.items);
             setApiStatus('success');
         } catch (err) { handleApiError(err); } 
         finally { setIsChannelLoading(false); }
+    }, []);
+
+    const handleSelectYouTubePlaylist = useCallback(async (playlist: YouTubePlaylist) => {
+        setIsYoutubePlaylistLoading(true);
+        setSelectedYouTubePlaylist(playlist);
+        setActiveView('youtubePlaylistDetail');
+        setYoutubePlaylistVideos([]);
+        try {
+            const { items } = await getPlaylistItems(playlist.id);
+            setYoutubePlaylistVideos(items);
+            setApiStatus('success');
+        } catch (err) { handleApiError(err); }
+        finally { setIsYoutubePlaylistLoading(false); }
     }, []);
 
     const handleEnterApp = () => {
@@ -343,9 +396,11 @@ const App: React.FC = () => {
                 return <ChannelView
                     channelTitle={selectedChannel.title}
                     videos={channelVideos}
+                    playlists={channelPlaylists}
                     isLoading={isChannelLoading}
                     isMoreLoading={false}
                     onSelectTrack={handleSelectTrack}
+                    onSelectPlaylist={handleSelectYouTubePlaylist}
                     onBack={() => setActiveView('home')}
                     onOpenAddToPlaylistModal={handleOpenAddToPlaylistModal}
                     onAddToOffline={handleAddToOffline}
@@ -353,6 +408,27 @@ const App: React.FC = () => {
                     currentTrackId={currentTrack?.id.videoId}
                     onLoadMore={() => {}}
                     hasNextPage={!!channelNextPageToken}
+                />;
+            case 'youtubePlaylistDetail':
+                if (!selectedYouTubePlaylist) return null;
+                return <PlaylistDetailView
+                    playlist={{
+                        id: selectedYouTubePlaylist.id,
+                        name: selectedYouTubePlaylist.snippet.title,
+                        tracks: youtubePlaylistVideos
+                    }}
+                    onSelectTrack={handleSelectTrack}
+                    onRemoveFromPlaylist={() => {}} // Cannot remove from YouTube playlist
+                    onSelectChannel={handleSelectChannel}
+                    currentTrackId={currentTrack?.id.videoId}
+                    isAutoplayEnabled={isAutoplayEnabled}
+                    onToggleAutoplay={() => setIsAutoplayEnabled(p => !p)}
+                    offlineItems={offlineItems}
+                    onAddToOffline={handleAddToOffline}
+                    onBack={() => setActiveView('channel')}
+                    onDelete={() => {}} // Cannot delete YouTube playlist
+                    onRename={() => {}} // Cannot rename YouTube playlist
+                    isYouTubePlaylist={true}
                 />;
             default: return null;
         }

@@ -31,6 +31,7 @@ export interface VideoItem {
     channelTitle: string;
     liveBroadcastContent: string;
     publishTime: string;
+    thumbnailData?: string; // Base64 encoded thumbnail for offline use
   };
 }
 
@@ -38,4 +39,19 @@ export interface Playlist {
   id: string;
   name: string;
   tracks: VideoItem[];
+}
+
+export interface YouTubePlaylist {
+  id: string;
+  snippet: {
+    title: string;
+    description: string;
+    thumbnails: VideoItem['snippet']['thumbnails'];
+    channelId: string;
+    channelTitle: string;
+    publishedAt: string;
+  };
+  contentDetails: {
+    itemCount: number;
+  };
 }

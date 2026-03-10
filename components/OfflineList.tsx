@@ -37,7 +37,7 @@ const OfflineItem: React.FC<{
             <div className="flex items-center gap-4 min-w-0">
                 <div className="relative flex-shrink-0">
                     <img
-                        src={item.snippet.thumbnails.default.url}
+                        src={item.snippet.thumbnailData || item.snippet.thumbnails.default.url}
                         alt={item.snippet.title}
                         className="w-10 h-10 rounded-md object-cover"
                     />
