@@ -1,7 +1,7 @@
 
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 import { SearchBar } from './components/SearchBar';
-import { getChannelVideos, getRelatedVideos, searchVideos, getChannelPlaylists, getPlaylistItems } from './services/youtubeService';
+import { getChannelVideos, getRelatedVideos, searchVideos, getChannelPlaylists, getPlaylistItems, setAppPin, verifyPinOnServer } from './services/youtubeService';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import type { VideoItem, Playlist, YouTubePlaylist } from './types';
 import { useYouTubePlayer } from './hooks/useYouTubePlayer';
@@ -58,6 +58,8 @@ const App: React.FC = () => {
     const [apiStatus, setApiStatus] = useState<ApiStatus>('idle');
     const [isAppEntered, setIsAppEntered] = useState<boolean>(false);
     const [isLandingPageMounted, setIsLandingPageMounted] = useState<boolean>(true);
+    const [pinError, setPinError] = useState<string | null>(null);
+    const [isPinVerifying, setIsPinVerifying] = useState<boolean>(false);
     const [isAutoplayBlocked, setIsAutoplayBlocked] = useState<boolean>(false);
 
     const [playlists, setPlaylists] = useLocalStorage<Playlist[]>('ytas-playlists', []);
@@ -179,6 +181,7 @@ const App: React.FC = () => {
                     setApiStatus('success');
                 } catch (err) { 
                     console.error("Gagal mengambil rekomendasi:", err);
+                    handleApiError(err);
                     setRecommendations([]);
                 } finally { 
                     setIsRecommendationsLoading(false); 
@@ -330,9 +333,24 @@ const App: React.FC = () => {
         finally { setIsYoutubePlaylistLoading(false); }
     }, []);
 
-    const handleEnterApp = () => {
-        setIsAppEntered(true);
-        setTimeout(() => setIsLandingPageMounted(false), 500);
+    const handleEnterApp = async (pin: string) => {
+        setIsPinVerifying(true);
+        setPinError(null);
+        
+        try {
+            const isValid = await verifyPinOnServer(pin);
+            if (isValid) {
+                setAppPin(pin);
+                setIsAppEntered(true);
+                setTimeout(() => setIsLandingPageMounted(false), 500);
+            } else {
+                setPinError('PIN yang Anda masukkan salah.');
+            }
+        } catch (err) {
+            setPinError('Gagal memverifikasi PIN. Periksa koneksi Anda.');
+        } finally {
+            setIsPinVerifying(false);
+        }
     };
 
     const renderMainView = () => {
@@ -487,7 +505,14 @@ const App: React.FC = () => {
 
     return (
         <>
-            {isLandingPageMounted && <LandingPage onEnter={handleEnterApp} isExiting={isAppEntered} />}
+            {isLandingPageMounted && (
+                <LandingPage 
+                    onEnter={handleEnterApp} 
+                    isExiting={isAppEntered} 
+                    error={pinError}
+                    isLoading={isPinVerifying}
+                />
+            )}
             <Suspense fallback={null}>
                 {modalTrack && (
                     <AddToPlaylistModal

@@ -1,13 +1,29 @@
 
 import type { VideoItem, YouTubePlaylist } from '../types';
 
-const BASE_URL = 'https://www.googleapis.com/youtube/v3';
+const BASE_URL = '/api/youtube';
 
-const API_KEYS = [
-    'AIzaSyBujGAkfUSWrRBzKBg9QADZgMDRc2YdS2w', // Kunci utama
-    'AIzaSyC7vsUuSEwOw1KFuWTpIHAn4WPI5F4EAa0'  // Kunci cadangan
-];
-let currentApiKeyIndex = 0;
+let appPin: string | null = null;
+
+export const setAppPin = (pin: string) => {
+  appPin = pin;
+};
+
+export const verifyPinOnServer = async (pin: string): Promise<boolean> => {
+  try {
+    const response = await fetch('/api/verify-pin', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-app-pin': pin
+      }
+    });
+    return response.ok;
+  } catch (error) {
+    console.error('PIN verification failed:', error);
+    return false;
+  }
+};
 
 interface ApiResponse {
     items: VideoItem[];
@@ -35,17 +51,15 @@ interface PlaylistItem {
 }
 
 const fetchFromApiCore = async (endpoint: string, params: URLSearchParams): Promise<any> => {
-    const apiKey = API_KEYS[currentApiKeyIndex];
-
-    if (!apiKey) {
-        currentApiKeyIndex = 0;
-        throw new Error('Semua kunci API yang tersedia telah melebihi kuota harian. Silakan coba lagi besok.');
-    }
-
-    params.set('key', apiKey);
-
     try {
-        const response = await fetch(`${BASE_URL}${endpoint}?${params.toString()}`);
+        const headers: HeadersInit = {};
+        if (appPin) {
+            headers['x-app-pin'] = appPin;
+        }
+
+        const response = await fetch(`${BASE_URL}${endpoint}?${params.toString()}`, {
+            headers
+        });
 
         if (response.ok) {
             return await response.json();
@@ -53,26 +67,26 @@ const fetchFromApiCore = async (endpoint: string, params: URLSearchParams): Prom
 
         const errorData = await response.json();
 
-        // Handle Key Rotation (403 or 400 with invalid key message)
-        if (response.status === 403 || (response.status === 400 && errorData?.error?.message?.includes('API key not valid'))) {
-            const reason = response.status === 403 ? "kuota habis" : "tidak valid";
-            console.warn(`Kunci API ke-${currentApiKeyIndex + 1} gagal (${reason}). Mencoba kunci berikutnya...`);
-            
-            currentApiKeyIndex++;
-            params.delete('key');
-            return fetchFromApiCore(endpoint, params);
-        }
-
         // Gracefully handle invalid argument errors (e.g., for deleted videos or non-existent channels)
         if (response.status === 400 && errorData?.error?.status === 'INVALID_ARGUMENT') {
             console.warn(`API returned 400 INVALID_ARGUMENT for endpoint ${endpoint}. Suppressing error and returning empty result.`);
             return { items: [] };
         }
 
-        // Only log actual unhandled errors to the console
-        console.error('YouTube API Error:', JSON.stringify(errorData, null, 2));
+        // Handle quota exhaustion (passed through from server)
+        if (response.status === 403) {
+            throw new Error('Semua kunci API yang tersedia telah melebihi kuota harian. Silakan coba lagi besok.');
+        }
 
-        const errorMessage = errorData.error?.message || 'Unknown API error';
+        // Handle invalid PIN
+        if (response.status === 401) {
+            throw new Error('PIN Akses tidak valid. Silakan muat ulang halaman dan coba lagi.');
+        }
+
+        // Only log actual unhandled errors to the console
+        console.error('YouTube Proxy Error:', JSON.stringify(errorData, null, 2));
+
+        const errorMessage = errorData.error?.message || 'Unknown Proxy error';
         throw new Error(`Permintaan API YouTube gagal dengan status ${response.status}: ${errorMessage}`);
 
     } catch (error) {
