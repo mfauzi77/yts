@@ -16,41 +16,27 @@ async function startServer() {
     process.env.YOUTUBE_API_KEY_2
   ].filter(Boolean) as string[];
 
-  const APP_PIN = process.env.APP_PIN;
-
   let currentApiKeyIndex = 0;
-
-  // Middleware to verify PIN
-  const verifyPin = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const pin = req.headers["x-app-pin"];
-    
-    if (!APP_PIN) {
-      // If no PIN is configured, allow all requests (for development/initial setup)
-      return next();
-    }
-
-    if (pin === APP_PIN) {
-      return next();
-    }
-
-    res.status(401).json({ error: "Unauthorized: Invalid PIN" });
-  };
 
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", vercel: !!process.env.VERCEL });
   });
 
-  app.post("/api/verify-pin", verifyPin, (req, res) => {
-    res.json({ success: true });
-  });
-
-  app.get("/api/youtube/:endpoint", verifyPin, async (req, res) => {
+  app.get("/api/youtube/:endpoint", async (req, res) => {
     const { endpoint } = req.params;
     const queryParams = new URLSearchParams(req.query as any);
     
+    if (API_KEYS.length === 0) {
+      return res.status(500).json({ 
+        error: { 
+          message: "YouTube API Keys are not configured in environment variables (YOUTUBE_API_KEY_1, YOUTUBE_API_KEY_2)." 
+        } 
+      });
+    }
+
     const fetchFromYouTube = async (keyIndex: number): Promise<any> => {
       if (keyIndex >= API_KEYS.length) {
-        return { error: "All API keys exhausted", status: 403 };
+        return { error: { message: "Semua kunci API telah melebihi kuota harian." }, status: 403 };
       }
 
       const apiKey = API_KEYS[keyIndex];
@@ -60,27 +46,37 @@ async function startServer() {
       
       try {
         const response = await fetch(url);
-        const data = await response.json();
+        const contentType = response.headers.get("content-type");
+        
+        let data;
+        if (contentType && contentType.includes("application/json")) {
+          data = await response.json();
+        } else {
+          const text = await response.text();
+          return { error: { message: `YouTube API returned non-JSON response: ${text.substring(0, 100)}` }, status: response.status };
+        }
 
         if (response.ok) {
           return { data, status: 200 };
         }
 
         // Handle quota exhaustion or invalid key
-        if (response.status === 403 || (response.status === 400 && data?.error?.message?.includes('API key not valid'))) {
-          console.warn(`API Key ${keyIndex + 1} failed. Trying next...`);
+        const errorMessage = data?.error?.message || "";
+        if (response.status === 403 || (response.status === 400 && errorMessage.includes('API key not valid'))) {
+          console.warn(`API Key ${keyIndex + 1} failed: ${errorMessage}. Trying next...`);
           currentApiKeyIndex = keyIndex + 1;
           return fetchFromYouTube(currentApiKeyIndex);
         }
 
         return { data, status: response.status };
       } catch (error) {
-        return { error: "Internal Server Error", status: 500 };
+        console.error("Proxy fetch error:", error);
+        return { error: { message: "Internal Server Error during YouTube fetch" }, status: 500 };
       }
     };
 
     const result = await fetchFromYouTube(currentApiKeyIndex);
-    res.status(result.status).json(result.data || { error: result.error });
+    res.status(result.status).json(result.data || result.error);
   });
 
   // Vite middleware for development

@@ -3,28 +3,6 @@ import type { VideoItem, YouTubePlaylist } from '../types';
 
 const BASE_URL = '/api/youtube';
 
-let appPin: string | null = null;
-
-export const setAppPin = (pin: string) => {
-  appPin = pin;
-};
-
-export const verifyPinOnServer = async (pin: string): Promise<boolean> => {
-  try {
-    const response = await fetch('/api/verify-pin', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-app-pin': pin
-      }
-    });
-    return response.ok;
-  } catch (error) {
-    console.error('PIN verification failed:', error);
-    return false;
-  }
-};
-
 interface ApiResponse {
     items: VideoItem[];
     nextPageToken?: string;
@@ -52,46 +30,49 @@ interface PlaylistItem {
 
 const fetchFromApiCore = async (endpoint: string, params: URLSearchParams): Promise<any> => {
     try {
-        const headers: HeadersInit = {};
-        if (appPin) {
-            headers['x-app-pin'] = appPin;
+        const response = await fetch(`${BASE_URL}${endpoint}?${params.toString()}`);
+        const contentType = response.headers.get("content-type");
+        
+        let data;
+        if (contentType && contentType.includes("application/json")) {
+            data = await response.json();
+        } else {
+            const text = await response.text();
+            console.error('Non-JSON response from server:', text.substring(0, 200));
+            throw new Error('Server mengembalikan format yang tidak valid (HTML). Pastikan API berjalan dengan benar.');
         }
-
-        const response = await fetch(`${BASE_URL}${endpoint}?${params.toString()}`, {
-            headers
-        });
 
         if (response.ok) {
-            return await response.json();
+            return data;
         }
 
-        const errorData = await response.json();
+        // Handle errors from our proxy
+        const errorMessage = data.error?.message || data.message || 'Unknown error';
+
+        // Handle quota exhaustion (passed through from server)
+        if (response.status === 403 || errorMessage.includes('kuota harian')) {
+            throw new Error('Semua kunci API yang tersedia telah melebihi kuota harian. Silakan coba lagi besok.');
+        }
+
+        // Handle configuration error
+        if (errorMessage.includes('not configured')) {
+            throw new Error('Kunci API YouTube belum dikonfigurasi di server. Silakan hubungi admin.');
+        }
 
         // Gracefully handle invalid argument errors (e.g., for deleted videos or non-existent channels)
-        if (response.status === 400 && errorData?.error?.status === 'INVALID_ARGUMENT') {
+        if (response.status === 400 && (data.error?.status === 'INVALID_ARGUMENT' || errorMessage.includes('INVALID_ARGUMENT'))) {
             console.warn(`API returned 400 INVALID_ARGUMENT for endpoint ${endpoint}. Suppressing error and returning empty result.`);
             return { items: [] };
         }
 
-        // Handle quota exhaustion (passed through from server)
-        if (response.status === 403) {
-            throw new Error('Semua kunci API yang tersedia telah melebihi kuota harian. Silakan coba lagi besok.');
-        }
-
-        // Handle invalid PIN
-        if (response.status === 401) {
-            throw new Error('PIN Akses tidak valid. Silakan muat ulang halaman dan coba lagi.');
-        }
-
         // Only log actual unhandled errors to the console
-        console.error('YouTube Proxy Error:', JSON.stringify(errorData, null, 2));
+        console.error('YouTube Proxy Error:', JSON.stringify(data, null, 2));
 
-        const errorMessage = errorData.error?.message || 'Unknown Proxy error';
-        throw new Error(`Permintaan API YouTube gagal dengan status ${response.status}: ${errorMessage}`);
+        throw new Error(`Permintaan API YouTube gagal (${response.status}): ${errorMessage}`);
 
     } catch (error) {
         console.error("Gagal melakukan fetch:", error);
-        if (error instanceof Error && (error.message.startsWith('Permintaan API') || error.message.startsWith('Semua kunci API'))) {
+        if (error instanceof Error) {
             throw error;
         }
         throw new Error("Tidak dapat terhubung ke layanan YouTube. Periksa koneksi internet Anda.");

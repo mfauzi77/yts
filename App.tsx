@@ -1,12 +1,11 @@
 
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 import { SearchBar } from './components/SearchBar';
-import { getChannelVideos, getRelatedVideos, searchVideos, getChannelPlaylists, getPlaylistItems, setAppPin, verifyPinOnServer } from './services/youtubeService';
+import { getChannelVideos, getRelatedVideos, searchVideos, getChannelPlaylists, getPlaylistItems } from './services/youtubeService';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import type { VideoItem, Playlist, YouTubePlaylist } from './types';
 import { useYouTubePlayer } from './hooks/useYouTubePlayer';
 import { ApiStatusIndicator } from './components/ApiStatusIndicator';
-import { LandingPage } from './components/LandingPage';
 import { Sidebar } from './components/Sidebar';
 import { BottomNavBar } from './components/BottomNavBar';
 import { ErrorDisplay } from './components/ErrorDisplay';
@@ -56,10 +55,6 @@ const App: React.FC = () => {
     const [isYoutubePlaylistLoading, setIsYoutubePlaylistLoading] = useState<boolean>(false);
 
     const [apiStatus, setApiStatus] = useState<ApiStatus>('idle');
-    const [isAppEntered, setIsAppEntered] = useState<boolean>(false);
-    const [isLandingPageMounted, setIsLandingPageMounted] = useState<boolean>(true);
-    const [pinError, setPinError] = useState<string | null>(null);
-    const [isPinVerifying, setIsPinVerifying] = useState<boolean>(false);
     const [isAutoplayBlocked, setIsAutoplayBlocked] = useState<boolean>(false);
 
     const [playlists, setPlaylists] = useLocalStorage<Playlist[]>('ytas-playlists', []);
@@ -160,8 +155,6 @@ const App: React.FC = () => {
     }, [apiStatus]);
 
     useEffect(() => {
-        if (!isAppEntered) return;
-
         const fetchRecommendations = async () => {
             if (history.length > 0) {
                 setIsRecommendationsLoading(true);
@@ -192,7 +185,7 @@ const App: React.FC = () => {
             }
         };
         fetchRecommendations();
-    }, [history, isAppEntered]);
+    }, [history]);
     
     const handleSearch = useCallback(async (query: string) => {
         if (!query.trim()) {
@@ -332,26 +325,6 @@ const App: React.FC = () => {
         } catch (err) { handleApiError(err); }
         finally { setIsYoutubePlaylistLoading(false); }
     }, []);
-
-    const handleEnterApp = async (pin: string) => {
-        setIsPinVerifying(true);
-        setPinError(null);
-        
-        try {
-            const isValid = await verifyPinOnServer(pin);
-            if (isValid) {
-                setAppPin(pin);
-                setIsAppEntered(true);
-                setTimeout(() => setIsLandingPageMounted(false), 500);
-            } else {
-                setPinError('PIN yang Anda masukkan salah.');
-            }
-        } catch (err) {
-            setPinError('Gagal memverifikasi PIN. Periksa koneksi Anda.');
-        } finally {
-            setIsPinVerifying(false);
-        }
-    };
 
     const renderMainView = () => {
         switch(activeView) {
@@ -505,14 +478,6 @@ const App: React.FC = () => {
 
     return (
         <>
-            {isLandingPageMounted && (
-                <LandingPage 
-                    onEnter={handleEnterApp} 
-                    isExiting={isAppEntered} 
-                    error={pinError}
-                    isLoading={isPinVerifying}
-                />
-            )}
             <Suspense fallback={null}>
                 {modalTrack && (
                     <AddToPlaylistModal
@@ -525,7 +490,7 @@ const App: React.FC = () => {
                 )}
             </Suspense>
 
-            <div className={`grid h-screen font-sans transition-opacity duration-500 ${isAppEntered ? 'opacity-100' : 'opacity-0'} ${currentTrack ? 'grid-rows-[1fr_auto]' : 'grid-rows-1'} grid-cols-1 md:grid-cols-[250px_1fr] bg-dark-bg text-dark-text`}>
+            <div className={`grid h-screen font-sans transition-opacity duration-500 ${currentTrack ? 'grid-rows-[1fr_auto]' : 'grid-rows-1'} grid-cols-1 md:grid-cols-[250px_1fr] bg-dark-bg text-dark-text`}>
                 <Sidebar activeView={activeView} setActiveView={setActiveView} />
 
                 <div className="flex flex-col overflow-hidden bg-dark-highlight">
