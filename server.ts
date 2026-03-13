@@ -1,10 +1,10 @@
 import express from "express";
 import cors from "cors";
-import { createServer as createViteServer } from "vite";
 import path from "path";
 
+const app = express();
+
 async function startServer() {
-  const app = express();
   const PORT = 3000;
 
   app.use(cors());
@@ -35,6 +35,10 @@ async function startServer() {
 
     res.status(401).json({ error: "Unauthorized: Invalid PIN" });
   };
+
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", vercel: !!process.env.VERCEL });
+  });
 
   app.post("/api/verify-pin", verifyPin, (req, res) => {
     res.json({ success: true });
@@ -80,7 +84,8 @@ async function startServer() {
   });
 
   // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
+  if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -94,9 +99,13 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  if (!process.env.VERCEL) {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }
 }
 
 startServer();
+
+export default app;
