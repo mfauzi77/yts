@@ -39,7 +39,7 @@ const PlaylistItem: React.FC<{
         </div>
         <div className="flex items-center gap-4">
              <img
-                src={item.snippet.thumbnails?.default?.url || 'https://picsum.photos/seed/music/200/200'}
+                src={item.snippet.thumbnails.default.url}
                 alt={item.snippet.title}
                 className="w-10 h-10 rounded-md object-cover"
             />
@@ -151,9 +151,8 @@ const PlaylistHeader: React.FC<{
 
 export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, currentTrackId, isAutoplayEnabled, onToggleAutoplay, offlineItems, onAddToOffline, onBack, onDelete, onRename, isYouTubePlaylist }) => {
   if (!playlist) return null;
-  const tracks = playlist.tracks || [];
 
-  if (tracks.length === 0) {
+  if (playlist.tracks.length === 0) {
     return (
       <>
         <PlaylistHeader playlist={playlist} onBack={onBack} onDelete={onDelete} onRename={onRename} isYouTubePlaylist={isYouTubePlaylist} />
@@ -179,7 +178,7 @@ export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist
             </div>
         </div>
         <div className="space-y-1">
-          {tracks.map((item, index) => {
+          {playlist.tracks.map((item, index) => {
             const isOffline = offlineItems.some(o => o.id.videoId === item.id.videoId);
             return (
                 <PlaylistItem 
@@ -192,7 +191,7 @@ export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist
                     isPlaying={currentTrackId === item.id.videoId}
                     isOffline={isOffline}
                     onAddToOffline={onAddToOffline}
-                    playlistTracks={tracks}
+                    playlistTracks={playlist.tracks}
                     isYouTubePlaylist={isYouTubePlaylist}
                 />
             )

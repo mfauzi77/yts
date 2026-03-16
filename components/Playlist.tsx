@@ -21,7 +21,7 @@ const PlaylistCard: React.FC<{
                 {playlist.tracks.slice(0, 4).map((track, index) => (
                     <img 
                         key={track.id.videoId + index}
-                        src={track.snippet.thumbnails?.medium?.url || track.snippet.thumbnails?.default?.url || 'https://picsum.photos/seed/music/200/200'}
+                        src={track.snippet.thumbnails.medium?.url || track.snippet.thumbnails.default.url}
                         alt=""
                         className="w-full h-full object-cover"
                     />
