@@ -1,13 +1,7 @@
 
 import type { VideoItem, YouTubePlaylist } from '../types';
 
-const BASE_URL = 'https://www.googleapis.com/youtube/v3';
-
-const API_KEYS = [
-    'AIzaSyBujGAkfUSWrRBzKBg9QADZgMDRc2YdS2w', // Kunci utama
-    'AIzaSyC7vsUuSEwOw1KFuWTpIHAn4WPI5F4EAa0'  // Kunci cadangan
-];
-let currentApiKeyIndex = 0;
+const BASE_URL = '/api/youtube/';
 
 interface ApiResponse {
     items: VideoItem[];
@@ -35,49 +29,55 @@ interface PlaylistItem {
 }
 
 const fetchFromApiCore = async (endpoint: string, params: URLSearchParams): Promise<any> => {
-    const apiKey = API_KEYS[currentApiKeyIndex];
-
-    if (!apiKey) {
-        currentApiKeyIndex = 0;
-        throw new Error('Semua kunci API yang tersedia telah melebihi kuota harian. Silakan coba lagi besok.');
-    }
-
-    params.set('key', apiKey);
-
     try {
-        const response = await fetch(`${BASE_URL}${endpoint}?${params.toString()}`);
-
-        if (response.ok) {
-            return await response.json();
+        const url = `${BASE_URL}${endpoint}?${params.toString()}`;
+        console.log(`Fetching from YouTube Proxy: ${url}`);
+        const response = await fetch(url);
+        const contentType = response.headers.get("content-type");
+        
+        let data;
+        if (contentType && contentType.includes("application/json")) {
+            data = await response.json();
+        } else {
+            const text = await response.text();
+            console.error('Non-JSON response from server:', text.substring(0, 200));
+            throw new Error(`Server mengembalikan format yang tidak valid (HTML). Ini biasanya terjadi jika rute API tidak ditemukan atau server sedang bermasalah. Status: ${response.status}`);
         }
 
-        const errorData = await response.json();
+        if (response.ok) {
+            return data;
+        }
 
-        // Handle Key Rotation (403 or 400 with invalid key message)
-        if (response.status === 403 || (response.status === 400 && errorData?.error?.message?.includes('API key not valid'))) {
-            const reason = response.status === 403 ? "kuota habis" : "tidak valid";
-            console.warn(`Kunci API ke-${currentApiKeyIndex + 1} gagal (${reason}). Mencoba kunci berikutnya...`);
-            
-            currentApiKeyIndex++;
-            params.delete('key');
-            return fetchFromApiCore(endpoint, params);
+        // Handle errors from our proxy
+        const errorMessage = data.error?.message || data.message || 'Unknown error';
+
+        // Handle quota exhaustion (passed through from server)
+        if (response.status === 403 || errorMessage.includes('kuota harian')) {
+            if (endpoint.includes('search')) {
+                throw new Error('Kuota pencarian YouTube telah habis untuk hari ini (Pencarian membutuhkan kuota 100x lebih besar). Anda masih bisa memutar lagu dari playlist atau riwayat.');
+            }
+            throw new Error('Semua kunci API yang tersedia telah melebihi kuota harian. Silakan coba lagi besok.');
+        }
+
+        // Handle configuration error
+        if (errorMessage.includes('not configured')) {
+            throw new Error('Kunci API YouTube belum dikonfigurasi di server. Silakan hubungi admin.');
         }
 
         // Gracefully handle invalid argument errors (e.g., for deleted videos or non-existent channels)
-        if (response.status === 400 && errorData?.error?.status === 'INVALID_ARGUMENT') {
+        if (response.status === 400 && (data.error?.status === 'INVALID_ARGUMENT' || errorMessage.includes('INVALID_ARGUMENT'))) {
             console.warn(`API returned 400 INVALID_ARGUMENT for endpoint ${endpoint}. Suppressing error and returning empty result.`);
             return { items: [] };
         }
 
         // Only log actual unhandled errors to the console
-        console.error('YouTube API Error:', JSON.stringify(errorData, null, 2));
+        console.error('YouTube Proxy Error:', JSON.stringify(data, null, 2));
 
-        const errorMessage = errorData.error?.message || 'Unknown API error';
-        throw new Error(`Permintaan API YouTube gagal dengan status ${response.status}: ${errorMessage}`);
+        throw new Error(`Permintaan API YouTube gagal (${response.status}): ${errorMessage}`);
 
     } catch (error) {
         console.error("Gagal melakukan fetch:", error);
-        if (error instanceof Error && (error.message.startsWith('Permintaan API') || error.message.startsWith('Semua kunci API'))) {
+        if (error instanceof Error) {
             throw error;
         }
         throw new Error("Tidak dapat terhubung ke layanan YouTube. Periksa koneksi internet Anda.");
@@ -95,7 +95,7 @@ export const searchVideos = async (query: string): Promise<VideoItem[]> => {
     type: 'video',
     maxResults: '25',
   });
-  const data = await fetchFromApiCore('/search', params);
+  const data = await fetchFromApiCore('search', params);
   const items = (data.items && Array.isArray(data.items))
       ? data.items.filter(item => item.id && typeof item.id.videoId === 'string' && item.id.videoId)
       : [];
@@ -113,7 +113,7 @@ export const getRelatedVideos = async (videoId: string): Promise<VideoItem[]> =>
         type: 'video',
         maxResults: '25',
     });
-    const data = await fetchFromApiCore('/search', params);
+    const data = await fetchFromApiCore('search', params);
     const items = (data.items && Array.isArray(data.items))
         ? data.items.filter(item => item.id && typeof item.id.videoId === 'string' && item.id.videoId)
         : [];
@@ -125,7 +125,7 @@ const getChannelUploadsPlaylistId = async (channelId: string): Promise<string | 
         part: 'contentDetails',
         id: channelId,
     });
-    const data = await fetchFromApiCore('/channels', params);
+    const data = await fetchFromApiCore('channels', params);
     return data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads || null;
 };
 
@@ -138,7 +138,7 @@ export const getPlaylistItems = async (playlistId: string, maxResults = 50, page
     if (pageToken) {
         params.set('pageToken', pageToken);
     }
-    const data: PlaylistApiResponse = await fetchFromApiCore('/playlistItems', params);
+    const data: PlaylistApiResponse = await fetchFromApiCore('playlistItems', params);
     
     // Transform PlaylistItem to VideoItem structure
     const items: VideoItem[] = (data.items || [])
@@ -151,14 +151,18 @@ export const getPlaylistItems = async (playlistId: string, maxResults = 50, page
                 videoId: item.snippet.resourceId.videoId,
             },
             snippet: {
-                publishedAt: item.snippet.publishedAt,
-                channelId: item.snippet.channelId,
-                title: item.snippet.title,
-                description: item.snippet.description,
-                thumbnails: item.snippet.thumbnails,
-                channelTitle: item.snippet.channelTitle,
+                publishedAt: item.snippet.publishedAt || new Date().toISOString(),
+                channelId: item.snippet.channelId || '',
+                title: item.snippet.title || 'Unknown Title',
+                description: item.snippet.description || '',
+                thumbnails: item.snippet.thumbnails || {
+                    default: { url: 'https://picsum.photos/seed/music/200/200', width: 120, height: 90 },
+                    medium: { url: 'https://picsum.photos/seed/music/200/200', width: 320, height: 180 },
+                    high: { url: 'https://picsum.photos/seed/music/200/200', width: 480, height: 360 }
+                },
+                channelTitle: item.snippet.channelTitle || 'Unknown Channel',
                 liveBroadcastContent: 'none',
-                publishTime: item.snippet.publishedAt,
+                publishTime: item.snippet.publishedAt || new Date().toISOString(),
             }
         }));
 
@@ -179,7 +183,7 @@ export const getChannelPlaylists = async (channelId: string, maxResults = 50, pa
     if (pageToken) {
         params.set('pageToken', pageToken);
     }
-    const data = await fetchFromApiCore('/playlists', params);
+    const data = await fetchFromApiCore('playlists', params);
     return { 
         items: data.items || [], 
         nextPageToken: data.nextPageToken 

@@ -22,20 +22,29 @@ const HistoryItem: React.FC<{
     isPlaying: boolean;
     history: VideoItem[];
 }> = ({ item, onSelectTrack, onOpenAddToPlaylistModal, onSelectChannel, isOffline, onAddToOffline, isPlaying, history }) => (
-    <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
+    <div className={`grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group ${isPlaying ? 'bg-dark-highlight/50' : ''}`}>
         <div className="relative w-12 h-12">
             <img
                 src={item.snippet.thumbnails.default.url}
                 alt={item.snippet.title}
                 className="w-full h-full rounded-md object-cover"
             />
-             <button
-                onClick={() => onSelectTrack(item, history)}
-                className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-md"
-                aria-label={`Putar ${item.snippet.title}`}
-            >
-                <i className="fas fa-play text-white text-lg"></i>
-            </button>
+            {isPlaying ? (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-md">
+                    <span className="relative flex h-4 w-4">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500"></span>
+                    </span>
+                </div>
+            ) : (
+                <button
+                    onClick={() => onSelectTrack(item, history)}
+                    className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-md"
+                    aria-label={`Putar ${item.snippet.title}`}
+                >
+                    <i className="fas fa-play text-white text-lg"></i>
+                </button>
+            )}
         </div>
         <div className="min-w-0">
             <p className={`text-sm font-semibold cursor-pointer ${isPlaying ? 'text-brand-red' : 'text-white'} [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden`} onClick={() => onSelectTrack(item, history)}>
