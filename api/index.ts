@@ -4,6 +4,8 @@ import path from "path";
 
 const app = express();
 
+console.log(`API Function Initializing... Node: ${process.version}`);
+
 app.use(cors());
 app.use(express.json());
 
@@ -17,6 +19,7 @@ app.get("/api/health", (req, res) => {
   res.json({ 
     status: "ok", 
     vercel: !!process.env.VERCEL,
+    node: process.version,
     env: process.env.NODE_ENV,
     keys: API_KEYS.length
   });
@@ -114,37 +117,5 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
     }
   });
 });
-
-async function startServer() {
-  const PORT = 3000;
-
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
-    const { createServer: createViteServer } = await import("vite");
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-    
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server running on http://localhost:${PORT}`);
-    });
-  } else if (!process.env.VERCEL) {
-    // Only serve static files if NOT on Vercel (e.g. local production build)
-    // On Vercel, Vercel handles static files via rewrites
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
-    
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server running on http://localhost:${PORT}`);
-    });
-  }
-}
-
-startServer();
 
 export default app;
