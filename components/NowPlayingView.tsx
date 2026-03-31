@@ -22,6 +22,8 @@ interface NowPlayingViewProps {
   seekTo: (time: number) => void;
   isAutoplayEnabled: boolean;
   onToggleAutoplay: () => void;
+  isShuffle: boolean;
+  onToggleShuffle: () => void;
   children?: React.ReactNode;
   isLiked: boolean;
   onToggleLike: () => void;
@@ -40,7 +42,7 @@ const ViewPlaceholder: React.FC = () => (
 
 export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
     isOpen, onClose, track, isPlaying, setIsPlaying, onNext, onPrev,
-    volume, setVolume, currentTime, duration, seekTo, isAutoplayEnabled, onToggleAutoplay,
+    volume, setVolume, currentTime, duration, seekTo, isAutoplayEnabled, onToggleAutoplay, isShuffle, onToggleShuffle,
     children, isLiked, onToggleLike
 }) => {
     const [showVisualizer, setShowVisualizer] = useState(false);
@@ -154,11 +156,11 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
 
                     <div className="flex justify-between items-center px-2 md:px-8">
                         <button
-                            onClick={() => setShowVisualEffect(p => !p)}
-                            title="Efek Visual"
-                            className={`w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-full text-white/60 hover:bg-white/10 hover:text-white transition-colors ${showVisualEffect ? 'text-brand-red !text-opacity-100 bg-white/5' : ''}`}
+                            onClick={onToggleShuffle}
+                            title={isShuffle ? "Matikan Acak" : "Aktifkan Acak"}
+                            className={`w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-full text-white/60 hover:bg-white/10 hover:text-white transition-colors ${isShuffle ? 'text-brand-red !text-opacity-100 bg-white/5' : ''}`}
                         >
-                            <i className="fas fa-magic text-lg"></i>
+                            <i className="fas fa-random text-lg"></i>
                         </button>
                         
                         <button onClick={onPrev} className="w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-full text-white hover:bg-white/10 transition-colors">
@@ -177,11 +179,11 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
                         </button>
 
                         <button
-                            onClick={() => setViewMode(p => p === 'lyrics' ? 'album' : 'lyrics')}
-                            title="Lirik"
-                            className={`w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-full text-white/60 hover:bg-white/10 hover:text-white transition-colors ${viewMode === 'lyrics' ? 'text-brand-red !text-opacity-100 bg-white/5' : ''}`}
+                            onClick={onToggleAutoplay}
+                            title={isAutoplayEnabled ? "Matikan Putar Otomatis" : "Aktifkan Putar Otomatis"}
+                            className={`w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-full text-white/60 hover:bg-white/10 hover:text-white transition-colors ${isAutoplayEnabled ? 'text-brand-red !text-opacity-100 bg-white/5' : ''}`}
                         >
-                            <i className="fas fa-microphone-alt text-lg"></i>
+                            <i className={`fas ${isAutoplayEnabled ? 'fa-redo-alt' : 'fa-redo'} text-lg`}></i>
                         </button>
                     </div>
                     
@@ -195,6 +197,24 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
                         >
                             <i className="fas fa-chart-bar text-xl"></i>
                             <span>Visual</span>
+                        </button>
+
+                        <button
+                            onClick={() => setViewMode(p => p === 'lyrics' ? 'album' : 'lyrics')}
+                            title="Lirik"
+                            className={`text-xs flex flex-col items-center gap-1 ${viewMode === 'lyrics' ? 'text-brand-red' : 'text-gray-400 hover:text-white'}`}
+                        >
+                            <i className="fas fa-microphone-alt text-xl"></i>
+                            <span>Lirik</span>
+                        </button>
+
+                        <button
+                            onClick={() => setShowVisualEffect(p => !p)}
+                            title="Efek Visual"
+                            className={`text-xs flex flex-col items-center gap-1 ${showVisualEffect ? 'text-brand-red' : 'text-gray-400 hover:text-white'}`}
+                        >
+                            <i className="fas fa-magic text-xl"></i>
+                            <span>Magic</span>
                         </button>
                     </div>
                 </div>

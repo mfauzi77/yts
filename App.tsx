@@ -22,9 +22,9 @@ const ChannelView = lazy(() => import('./components/ChannelView').then(m => ({ d
 const OfflineList = lazy(() => import('./components/OfflineList').then(m => ({ default: m.OfflineList })));
 const AddToPlaylistModal = lazy(() => import('./components/AddToPlaylistModal').then(m => ({ default: m.AddToPlaylistModal })));
 const PlaylistDetailView = lazy(() => import('./components/PlaylistDetailView').then(m => ({ default: m.PlaylistDetailView })));
-const LiteView = lazy(() => import('./components/LiteView').then(m => ({ default: m.LiteView })));
 
-type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'offline' | 'channel' | 'lite' | 'youtubePlaylistDetail';
+
+type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'offline' | 'channel' | 'youtubePlaylistDetail';
 type ApiStatus = 'idle' | 'success' | 'error';
 
 const LoadingSpinner: React.FC = () => (
@@ -65,6 +65,7 @@ const App: React.FC = () => {
     const [offlineItems, setOfflineItems] = useLocalStorage<VideoItem[]>('ytas-offline', []);
     const [syncedOfflineIds, setSyncedOfflineIds] = useLocalStorage<string[]>('ytas-synced-ids', []);
     const [isAutoplayEnabled, setIsAutoplayEnabled] = useLocalStorage<boolean>('ytas-autoplay', true);
+    const [isShuffle, setIsShuffle] = useLocalStorage<boolean>('ytas-shuffle', false);
     const [likedSongs, setLikedSongs] = useLocalStorage<string[]>('ytas-liked-songs', []);
     
     const [activePlaylist, setActivePlaylist] = useState<Playlist | null>(null);
@@ -195,9 +196,24 @@ const App: React.FC = () => {
 
     const playNext = useCallback(() => {
         if (activePlaybackList.length === 0) return;
-        currentTrackIndexRef.current = (currentTrackIndexRef.current + 1) % activePlaybackList.length;
+        
+        if (isShuffle) {
+            let nextIndex;
+            // Pick a random song that isn't the current one (if possible)
+            if (activePlaybackList.length > 1) {
+                do {
+                    nextIndex = Math.floor(Math.random() * activePlaybackList.length);
+                } while (nextIndex === currentTrackIndexRef.current);
+            } else {
+                nextIndex = 0;
+            }
+            currentTrackIndexRef.current = nextIndex;
+        } else {
+            currentTrackIndexRef.current = (currentTrackIndexRef.current + 1) % activePlaybackList.length;
+        }
+        
         handleSelectTrack(activePlaybackList[currentTrackIndexRef.current], activePlaybackList);
-    }, [activePlaybackList, handleSelectTrack]);
+    }, [activePlaybackList, handleSelectTrack, isShuffle]);
 
     const playPrev = useCallback(() => {
         if (activePlaybackList.length === 0) return;
@@ -307,14 +323,7 @@ const App: React.FC = () => {
                     onAddToOffline={handleAddToOffline}
                     currentTrackId={currentTrack?.id.videoId}
                 />;
-            case 'lite':
-                return <LiteView
-                    onSelectTrack={handleSelectTrack}
-                    onOpenAddToPlaylistModal={handleOpenAddToPlaylistModal}
-                    onAddToOffline={handleAddToOffline}
-                    offlineItems={offlineItems}
-                    currentTrackId={currentTrack?.id.videoId}
-                />;
+
             case 'playlists':
                 return <PlaylistListView
                     playlists={playlists}
@@ -331,6 +340,8 @@ const App: React.FC = () => {
                     currentTrackId={currentTrack?.id.videoId}
                     isAutoplayEnabled={isAutoplayEnabled}
                     onToggleAutoplay={() => setIsAutoplayEnabled(p => !p)}
+                    isShuffle={isShuffle}
+                    onToggleShuffle={() => setIsShuffle(p => !p)}
                     offlineItems={offlineItems}
                     onAddToOffline={handleAddToOffline}
                     onBack={() => setActiveView('playlists')}
@@ -394,6 +405,8 @@ const App: React.FC = () => {
                     currentTrackId={currentTrack?.id.videoId}
                     isAutoplayEnabled={isAutoplayEnabled}
                     onToggleAutoplay={() => setIsAutoplayEnabled(p => !p)}
+                    isShuffle={isShuffle}
+                    onToggleShuffle={() => setIsShuffle(p => !p)}
                     offlineItems={offlineItems}
                     onAddToOffline={handleAddToOffline}
                     onBack={() => setActiveView('channel')}
@@ -407,7 +420,7 @@ const App: React.FC = () => {
 
     const viewTitles: { [key in MainView]?: string } = {
         home: 'Beranda',
-        lite: 'Mode Lite',
+
         playlists: 'Playlist',
         history: 'Riwayat',
         offline: 'Offline',
@@ -483,6 +496,8 @@ const App: React.FC = () => {
                                 onSelectChannel={handleSelectChannel}
                                 isAutoplayEnabled={isAutoplayEnabled}
                                 onToggleAutoplay={() => setIsAutoplayEnabled(p => !p)}
+                                isShuffle={isShuffle}
+                                onToggleShuffle={() => setIsShuffle(p => !p)}
                             />
                         </footer>
                     )}
@@ -505,6 +520,8 @@ const App: React.FC = () => {
                             seekTo={seekTo}
                             isAutoplayEnabled={isAutoplayEnabled}
                             onToggleAutoplay={() => setIsAutoplayEnabled(p => !p)}
+                            isShuffle={isShuffle}
+                            onToggleShuffle={() => setIsShuffle(p => !p)}
                             isLiked={likedSongs.includes(currentTrack.id.videoId)}
                             onToggleLike={() => handleToggleLike(currentTrack)}
                         >

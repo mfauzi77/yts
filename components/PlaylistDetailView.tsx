@@ -10,6 +10,8 @@ interface PlaylistDetailViewProps {
   currentTrackId?: string | null;
   isAutoplayEnabled: boolean;
   onToggleAutoplay: () => void;
+  isShuffle: boolean;
+  onToggleShuffle: () => void;
   offlineItems: VideoItem[];
   onAddToOffline: (track: VideoItem) => void;
   onBack: () => void;
@@ -149,7 +151,7 @@ const PlaylistHeader: React.FC<{
 };
 
 
-export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, currentTrackId, isAutoplayEnabled, onToggleAutoplay, offlineItems, onAddToOffline, onBack, onDelete, onRename, isYouTubePlaylist }) => {
+export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, currentTrackId, isAutoplayEnabled, onToggleAutoplay, isShuffle, onToggleShuffle, offlineItems, onAddToOffline, onBack, onDelete, onRename, isYouTubePlaylist }) => {
   if (!playlist) return null;
 
   if (playlist.tracks.length === 0) {
@@ -168,7 +170,14 @@ export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist
   return (
     <div>
         <PlaylistHeader playlist={playlist} onBack={onBack} onDelete={onDelete} onRename={onRename} isYouTubePlaylist={isYouTubePlaylist} />
-        <div className="flex items-center justify-end mb-4 pr-2">
+        <div className="flex flex-wrap items-center justify-end gap-6 mb-4 pr-2">
+            <div className="flex items-center">
+                <span className="mr-3 text-sm font-medium text-dark-subtext">Acak</span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" checked={isShuffle} onChange={onToggleShuffle} className="sr-only peer" />
+                    <div className="w-11 h-6 bg-dark-card peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-brand-red"></div>
+                </label>
+            </div>
             <div className="flex items-center">
                 <span className="mr-3 text-sm font-medium text-dark-subtext">Putar Otomatis</span>
                 <label className="relative inline-flex items-center cursor-pointer">

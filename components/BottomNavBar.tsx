@@ -1,7 +1,7 @@
 
 import React from 'react';
 
-type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'offline' | 'channel' | 'video' | 'lite';
+type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'offline' | 'channel' | 'video';
 
 interface BottomNavBarProps {
   activeView: MainView;
@@ -34,12 +34,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeView, setActiv
                 isActive={activeView === 'home'}
                 onClick={() => setActiveView('home')}
             />
-            <NavItem
-                icon="fa-bolt"
-                label="Lite"
-                isActive={activeView === 'lite'}
-                onClick={() => setActiveView('lite')}
-            />
+
             <NavItem
                 icon="fa-list-ul"
                 label="Playlist"

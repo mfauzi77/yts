@@ -16,6 +16,8 @@ interface PlayerProps {
   seekTo: (seconds: number) => void;
   isAutoplayEnabled: boolean;
   onToggleAutoplay: () => void;
+  isShuffle: boolean;
+  onToggleShuffle: () => void;
 }
 
 const formatTime = (seconds: number) => {
@@ -29,7 +31,7 @@ const formatTime = (seconds: number) => {
 export const Player: React.FC<PlayerProps> = ({
     track, isPlaying, setIsPlaying, onNext, onPrev, onToggleNowPlaying,
     onSelectChannel, volume, setVolume, currentTime, duration, seekTo,
-    isAutoplayEnabled, onToggleAutoplay
+    isAutoplayEnabled, onToggleAutoplay, isShuffle, onToggleShuffle
 }) => {
     
     useEffect(() => {
@@ -134,10 +136,17 @@ export const Player: React.FC<PlayerProps> = ({
                     </div>
                     <button
                         onClick={onToggleAutoplay}
-                        title="Alihkan Putar Otomatis"
-                        className={`p-2 rounded-full text-dark-subtext hover:bg-dark-card hover:text-white transition-colors ${isAutoplayEnabled ? 'text-brand-red' : ''}`}
+                        title={isAutoplayEnabled ? "Matikan Putar Otomatis" : "Aktifkan Putar Otomatis"}
+                        className={`p-2 rounded-full transition-colors ${isAutoplayEnabled ? 'text-brand-red' : 'text-dark-subtext hover:bg-dark-card hover:text-white'}`}
                     >
-                        <i className="fas fa-redo-alt"></i>
+                        <i className={`fas ${isAutoplayEnabled ? 'fa-redo-alt' : 'fa-redo'}`}></i>
+                    </button>
+                    <button
+                        onClick={onToggleShuffle}
+                        title={isShuffle ? "Matikan Acak" : "Aktifkan Acak"}
+                        className={`p-2 rounded-full transition-colors ${isShuffle ? 'text-brand-red' : 'text-dark-subtext hover:bg-dark-card hover:text-white'}`}
+                    >
+                        <i className="fas fa-random"></i>
                     </button>
                     <div className="flex items-center space-x-2 w-32">
                         <i className={`fas ${volume === 0 ? 'fa-volume-mute' : 'fa-volume-down'} text-dark-subtext`}></i>
