@@ -30,23 +30,12 @@ const PlaylistItem: React.FC<{
     playlistTracks: VideoItem[];
     isYouTubePlaylist?: boolean;
 }> = ({ item, index, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, isPlaying, isOffline, onAddToOffline, playlistTracks, isYouTubePlaylist }) => (
-    <div className={`grid grid-cols-[20px_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group ${isPlaying ? 'bg-dark-highlight/50' : ''}`}>
+    <div className="grid grid-cols-[20px_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
         <div className="flex items-center justify-center text-dark-subtext">
-            {isPlaying ? (
-                <div className="flex items-center justify-center">
-                    <span className="relative flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-                    </span>
-                </div>
-            ) : (
-                <>
-                    <span className="group-hover:hidden">{index + 1}</span>
-                    <button onClick={() => onSelectTrack(item, playlistTracks)} className="hidden group-hover:block" aria-label={`Putar ${item.snippet.title}`}>
-                        <i className="fas fa-play text-white"></i>
-                    </button>
-                </>
-            )}
+            <span className="group-hover:hidden">{index + 1}</span>
+            <button onClick={() => onSelectTrack(item, playlistTracks)} className="hidden group-hover:block" aria-label={`Putar ${item.snippet.title}`}>
+                <i className="fas fa-play text-white"></i>
+            </button>
         </div>
         <div className="flex items-center gap-4">
              <img
@@ -179,19 +168,7 @@ export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist
   return (
     <div>
         <PlaylistHeader playlist={playlist} onBack={onBack} onDelete={onDelete} onRename={onRename} isYouTubePlaylist={isYouTubePlaylist} />
-        <div className="flex items-center justify-between mb-4 pr-2">
-            <div className="flex items-center space-x-2">
-                <button 
-                    onClick={() => {
-                        const shuffled = [...playlist.tracks].sort(() => Math.random() - 0.5);
-                        onSelectTrack(shuffled[0], shuffled);
-                    }}
-                    className="flex items-center space-x-2 px-4 py-2 bg-brand-red hover:bg-red-700 text-white rounded-full text-sm font-bold transition-all transform active:scale-95 shadow-lg"
-                >
-                    <i className="fas fa-random"></i>
-                    <span>Acak & Putar</span>
-                </button>
-            </div>
+        <div className="flex items-center justify-end mb-4 pr-2">
             <div className="flex items-center">
                 <span className="mr-3 text-sm font-medium text-dark-subtext">Putar Otomatis</span>
                 <label className="relative inline-flex items-center cursor-pointer">

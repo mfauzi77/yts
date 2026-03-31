@@ -66,7 +66,6 @@ const App: React.FC = () => {
     const [syncedOfflineIds, setSyncedOfflineIds] = useLocalStorage<string[]>('ytas-synced-ids', []);
     const [isAutoplayEnabled, setIsAutoplayEnabled] = useLocalStorage<boolean>('ytas-autoplay', true);
     const [likedSongs, setLikedSongs] = useLocalStorage<string[]>('ytas-liked-songs', []);
-    const [isOnline, setIsOnline] = useState(navigator.onLine);
     
     const [activePlaylist, setActivePlaylist] = useState<Playlist | null>(null);
     const [modalTrack, setModalTrack] = useState<VideoItem | null>(null);
@@ -176,16 +175,6 @@ const App: React.FC = () => {
     }, [setHistory]);
 
     const handleSelectTrack = useCallback((track: VideoItem, contextList: VideoItem[] = []) => {
-        // Jika trek sama, pastikan status isPlaying benar dan paksa player untuk play
-        if (currentTrack?.id.videoId === track.id.videoId) {
-            setIsPlaying(true);
-            // Memicu sinkronisasi ulang jika perlu
-            if (window.innerWidth < 768) {
-                setIsNowPlayingViewOpen(true);
-            }
-            return;
-        }
-
         setCurrentTrack(track);
         setIsPlaying(true);
         setIsAutoplayBlocked(false);
@@ -223,95 +212,16 @@ const App: React.FC = () => {
             setIsPlaying(false);
         } else if (event.data === 0) {
             if (isAutoplayEnabled) {
-                // Tambahkan sedikit penundaan untuk memastikan transisi lancar di mobile
-                setTimeout(() => playNext(), 500);
+                playNext();
             }
         }
     }, [playNext, isAutoplayEnabled]);
-
-    const handlePlayerError = useCallback((event: { data: number }) => {
-        console.error("YouTube Player Error:", event.data);
-        // Jika error karena masalah jaringan (biasanya 150 atau 101), coba putar ulang saat online
-        if (event.data === 150 || event.data === 101 || event.data === 2) {
-            if (navigator.onLine) {
-                // Coba muat ulang video yang sama
-                const current = currentTrack;
-                if (current) {
-                    setCurrentTrack(null);
-                    setTimeout(() => setCurrentTrack(current), 100);
-                }
-            }
-        }
-    }, [currentTrack]);
 
     const { volume, setVolume, seekTo, currentTime, duration } = useYouTubePlayer({
         videoId: currentTrack?.id.videoId ?? null,
         isPlaying,
         onStateChange: handlePlayerStateChange,
-        onError: handlePlayerError,
     });
-
-    // Media Session API for better background playback and mobile support
-    useEffect(() => {
-        if ('mediaSession' in navigator && currentTrack) {
-            navigator.mediaSession.metadata = new MediaMetadata({
-                title: currentTrack.snippet.title,
-                artist: currentTrack.snippet.channelTitle,
-                album: 'YouTube Audio',
-                artwork: [
-                    { src: currentTrack.snippet.thumbnails.default.url, sizes: '120x90', type: 'image/jpeg' },
-                    { src: currentTrack.snippet.thumbnails.medium?.url || '', sizes: '320x180', type: 'image/jpeg' },
-                    { src: currentTrack.snippet.thumbnails.high?.url || '', sizes: '480x360', type: 'image/jpeg' },
-                ]
-            });
-
-            navigator.mediaSession.setActionHandler('play', () => setIsPlaying(true));
-            navigator.mediaSession.setActionHandler('pause', () => setIsPlaying(false));
-            navigator.mediaSession.setActionHandler('previoustrack', playPrev);
-            navigator.mediaSession.setActionHandler('nexttrack', playNext);
-            
-            // Update playback state
-            navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
-
-            // Update position state if supported
-            if ('setPositionState' in navigator.mediaSession) {
-                try {
-                    navigator.mediaSession.setPositionState({
-                        duration: duration || 0,
-                        playbackRate: 1,
-                        position: currentTime || 0
-                    });
-                } catch (e) {
-                    // Ignore errors if parameters are invalid
-                }
-            }
-        }
-    }, [currentTrack, isPlaying, playNext, playPrev, currentTime, duration]);
-
-    // Network Status Handling
-    useEffect(() => {
-        const handleOnline = () => {
-            setIsOnline(true);
-            // Jika sebelumnya sedang memutar tapi terhenti karena sinyal
-            if (isPlaying && currentTrack) {
-                // Trik untuk memicu muat ulang player
-                const current = currentTrack;
-                setCurrentTrack(null);
-                setTimeout(() => {
-                    setCurrentTrack(current);
-                    setIsPlaying(true);
-                }, 500);
-            }
-        };
-        const handleOffline = () => setIsOnline(false);
-
-        window.addEventListener('online', handleOnline);
-        window.addEventListener('offline', handleOffline);
-        return () => {
-            window.removeEventListener('online', handleOnline);
-            window.removeEventListener('offline', handleOffline);
-        };
-    }, [isPlaying, currentTrack]);
 
     const handleOpenAddToPlaylistModal = (track: VideoItem) => setModalTrack(track);
     const handleCloseAddToPlaylistModal = () => setModalTrack(null);
@@ -526,7 +436,7 @@ const App: React.FC = () => {
                         <h1 className="text-3xl md:text-4xl font-bold text-white">
                             {viewTitles[activeView] || 'YTS'}
                         </h1>
-                        {!isOnline && (
+                        {!navigator.onLine && (
                             <div className="flex items-center text-yellow-500 text-sm font-semibold bg-yellow-500/10 px-3 py-1 rounded-full border border-yellow-500/20">
                                 <i className="fas fa-wifi-slash mr-2"></i>
                                 Offline
