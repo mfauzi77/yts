@@ -156,30 +156,30 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
 
                     <div className="flex justify-between items-center px-2 md:px-8">
                         <button
-                            onClick={onToggleShuffle}
+                            onClick={() => { onToggleShuffle(); if (navigator.vibrate) navigator.vibrate(15); }}
                             title={isShuffle ? "Matikan Acak" : "Aktifkan Acak"}
                             className={`w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-full text-white/60 hover:bg-white/10 hover:text-white transition-colors ${isShuffle ? 'text-brand-red !text-opacity-100 bg-white/5' : ''}`}
                         >
                             <i className="fas fa-random text-lg"></i>
                         </button>
                         
-                        <button onClick={onPrev} className="w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-full text-white hover:bg-white/10 transition-colors">
+                        <button onClick={() => { onPrev(); if (navigator.vibrate) navigator.vibrate(15); }} className="w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-full text-white hover:bg-white/10 transition-colors">
                             <i className="fas fa-step-backward text-2xl"></i>
                         </button>
                         
                         <button 
-                            onClick={() => setIsPlaying(!isPlaying)} 
+                            onClick={() => { setIsPlaying(!isPlaying); if (navigator.vibrate) navigator.vibrate(25); }} 
                             className="w-16 h-16 md:w-20 md:h-20 flex items-center justify-center bg-white text-black rounded-full shadow-lg shadow-white/10 hover:scale-105 active:scale-95 transition-all"
                         >
                             <i className={`fas ${isPlaying ? 'fa-pause' : 'fa-play'} text-3xl md:text-4xl ml-1`}></i>
                         </button>
                         
-                        <button onClick={onNext} className="w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-full text-white hover:bg-white/10 transition-colors">
+                        <button onClick={() => { onNext(); if (navigator.vibrate) navigator.vibrate(15); }} className="w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-full text-white hover:bg-white/10 transition-colors">
                             <i className="fas fa-step-forward text-2xl"></i>
                         </button>
 
                         <button
-                            onClick={onToggleAutoplay}
+                            onClick={() => { onToggleAutoplay(); if (navigator.vibrate) navigator.vibrate(15); }}
                             title={isAutoplayEnabled ? "Matikan Putar Otomatis" : "Aktifkan Putar Otomatis"}
                             className={`w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-full text-white/60 hover:bg-white/10 hover:text-white transition-colors ${isAutoplayEnabled ? 'text-brand-red !text-opacity-100 bg-white/5' : ''}`}
                         >

@@ -65,6 +65,12 @@ export const useYouTubePlayer = ({ videoId, isPlaying, onStateChange }: UseYouTu
                         setIsReady(true);
                     },
                     'onStateChange': (event) => onStateChangeRef.current?.(event),
+                    'onError': (event) => {
+                        console.error('[YouTube Player Error]:', event.data);
+                        // 150/101 are embed restrictions, 2 is invalid video id, 5 is HTML5 error.
+                        // We should notify App.tsx that something went wrong.
+                        onStateChangeRef.current?.({ data: -1 }); // Custom error state
+                    }
                 }
             });
         }
@@ -101,21 +107,30 @@ export const useYouTubePlayer = ({ videoId, isPlaying, onStateChange }: UseYouTu
     useEffect(() => {
         if (!isReady) return;
 
-        clearTimeInterval(); // Clear any existing interval
+        clearTimeInterval();
+        
+        const playerState = playerRef.current?.getPlayerState();
+        
         if (isPlaying) {
-            playerRef.current?.playVideo();
+            // Attempt to play if not already playing or buffering
+            if (playerState !== 1 && playerState !== 3) {
+                playerRef.current?.playVideo();
+            }
+            
             intervalRef.current = window.setInterval(() => {
                 const newDuration = playerRef.current?.getDuration() ?? 0;
                 const newTime = playerRef.current?.getCurrentTime() ?? 0;
-                setDuration(newDuration);
+                if (newDuration > 0) setDuration(newDuration);
                 setCurrentTime(newTime);
             }, 500);
         } else {
-            playerRef.current?.pauseVideo();
+            if (playerState === 1 || playerState === 3 || playerState === 5) {
+                playerRef.current?.pauseVideo();
+            }
         }
         
         return clearTimeInterval;
-    }, [isReady, isPlaying]);
+    }, [isReady, isPlaying, videoId]);
     
     const setVolume = useCallback((newVolume: number) => {
         if (isReady) {

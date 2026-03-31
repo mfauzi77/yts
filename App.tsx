@@ -180,6 +180,11 @@ const App: React.FC = () => {
         setIsPlaying(true);
         setIsAutoplayBlocked(false);
         addToHistory(track);
+        
+        // Haptic feedback for mobile
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+            navigator.vibrate(20);
+        }
 
         // Otomatis sinkronkan metadata jika diputar
         if (offlineItems.some(i => i.id.videoId === track.id.videoId)) {
@@ -222,14 +227,35 @@ const App: React.FC = () => {
     }, [activePlaybackList, handleSelectTrack]);
 
     const handlePlayerStateChange = useCallback((event: { data: number }) => {
-        if (event.data === 1) {
+        const PlayerState = {
+            ENDED: 0,
+            PLAYING: 1,
+            PAUSED: 2,
+            BUFFERING: 3,
+            CUED: 5
+        };
+
+        console.log(`[Player State Change]: ${Object.keys(PlayerState).find(key => (PlayerState as any)[key] === event.data)} (${event.data})`);
+
+        if (event.data === PlayerState.PLAYING) {
             setIsPlaying(true);
-        } else if (event.data === 2) {
-            setIsPlaying(false);
-        } else if (event.data === 0) {
+            setApiStatus('success');
+        } else if (event.data === PlayerState.ENDED) {
             if (isAutoplayEnabled) {
+                console.log("[Auto-Next]: Song ended, jumping to next...");
                 playNext();
+            } else {
+                setIsPlaying(false);
             }
+        } else if (event.data === PlayerState.PAUSED) {
+            // Only set isPlaying to false if the connection is likely stable
+            // but the player stopped (usually manual or device-level pause)
+            // On mobile, lock screen 'pause' will trigger this.
+            // We'll keep the state updated so UI reflects Reality.
+            setIsPlaying(false);
+        } else if (event.data === PlayerState.BUFFERING) {
+            // Keep isPlaying as true during buffering so it auto-resumes
+            setIsPlaying(true);
         }
     }, [playNext, isAutoplayEnabled]);
 
