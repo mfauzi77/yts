@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 interface LandingPageProps {
@@ -7,28 +8,24 @@ interface LandingPageProps {
 
 export const LandingPage: React.FC<LandingPageProps> = ({ onEnter, isExiting }) => {
   return (
-    <div className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-dark-bg text-dark-text font-sans transition-opacity duration-500 ease-in-out ${isExiting ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-      <div className="text-center">
-        <div className="relative inline-block">
-            <i className="fab fa-youtube text-brand-red text-8xl md:text-9xl animate-pulse drop-shadow-2xl"></i>
-            <div className="absolute inset-0 bg-brand-red blur-3xl opacity-20 rounded-full"></div>
+    <div className={`fixed inset-0 z-[100] flex flex-col items-center justify-center bg-dark-bg transition-opacity duration-500 ${isExiting ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+      <div className="text-center space-y-6 px-4">
+        <div className="w-24 h-24 bg-brand-red rounded-2xl flex items-center justify-center mx-auto shadow-2xl shadow-brand-red/20 animate-pulse">
+          <i className="fas fa-play text-white text-4xl ml-1"></i>
         </div>
-
-        <h1 className="mt-6 text-4xl md:text-5xl font-bold tracking-tight text-white">
-          YTS
-        </h1>
-        
-        <p className="mt-2 text-lg text-dark-subtext">
-          Musikmu, Tanpa Gangguan.
-        </p>
-
-        <button
+        <div className="space-y-2">
+          <h1 className="text-5xl font-bold text-white tracking-tighter">YTS</h1>
+          <p className="text-dark-text/60 text-lg font-medium">YouTube Audio Streamer</p>
+        </div>
+        <button 
           onClick={onEnter}
-          className="mt-10 px-8 py-3 bg-brand-red text-white font-semibold rounded-full hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-brand-red/50 transition-all duration-200 ease-in-out shadow-lg hover:shadow-red-900/50 transform hover:-translate-y-1 border border-white/5"
-          aria-label="Mulai Mendengarkan"
+          className="px-10 py-4 bg-brand-red hover:bg-red-600 text-white rounded-full font-bold text-lg transition-all transform hover:scale-105 active:scale-95 shadow-xl shadow-brand-red/20"
         >
-          Mulai Mendengarkan
+          Masuk Sekarang
         </button>
+      </div>
+      <div className="absolute bottom-8 text-dark-text/30 text-sm font-medium">
+        v0.0.0 • Built for Speed
       </div>
     </div>
   );
