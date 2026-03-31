@@ -1,7 +1,7 @@
 
 import React from 'react';
 
-type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'offline' | 'channel' | 'video';
+type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'offline' | 'channel' | 'video' | 'lite';
 
 interface SidebarProps {
   activeView: MainView;
@@ -41,6 +41,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) =
                     label="Beranda" 
                     isActive={activeView === 'home'} 
                     onClick={() => setActiveView('home')} 
+                />
+                <NavLink 
+                    icon="fa-bolt" 
+                    label="Lite" 
+                    isActive={activeView === 'lite'} 
+                    onClick={() => setActiveView('lite')} 
                 />
                 <NavLink 
                     icon="fa-list-ul" 

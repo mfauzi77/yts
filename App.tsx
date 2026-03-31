@@ -22,8 +22,9 @@ const ChannelView = lazy(() => import('./components/ChannelView').then(m => ({ d
 const OfflineList = lazy(() => import('./components/OfflineList').then(m => ({ default: m.OfflineList })));
 const AddToPlaylistModal = lazy(() => import('./components/AddToPlaylistModal').then(m => ({ default: m.AddToPlaylistModal })));
 const PlaylistDetailView = lazy(() => import('./components/PlaylistDetailView').then(m => ({ default: m.PlaylistDetailView })));
+const LiteView = lazy(() => import('./components/LiteView').then(m => ({ default: m.LiteView })));
 
-type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'offline' | 'channel' | 'youtubePlaylistDetail';
+type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'offline' | 'channel' | 'lite' | 'youtubePlaylistDetail';
 type ApiStatus = 'idle' | 'success' | 'error';
 
 const LoadingSpinner: React.FC = () => (
@@ -396,6 +397,14 @@ const App: React.FC = () => {
                     onAddToOffline={handleAddToOffline}
                     currentTrackId={currentTrack?.id.videoId}
                 />;
+            case 'lite':
+                return <LiteView
+                    onSelectTrack={handleSelectTrack}
+                    onOpenAddToPlaylistModal={handleOpenAddToPlaylistModal}
+                    onAddToOffline={handleAddToOffline}
+                    offlineItems={offlineItems}
+                    currentTrackId={currentTrack?.id.videoId}
+                />;
             case 'playlists':
                 return <PlaylistListView
                     playlists={playlists}
@@ -488,6 +497,7 @@ const App: React.FC = () => {
 
     const viewTitles: { [key in MainView]?: string } = {
         home: 'Beranda',
+        lite: 'Mode Lite',
         playlists: 'Playlist',
         history: 'Riwayat',
         offline: 'Offline',
