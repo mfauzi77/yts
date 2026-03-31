@@ -12,6 +12,7 @@ interface OfflineListProps {
   isSyncing: boolean;
   onStartSync: () => void;
   syncingTrackProgress: number;
+  getDownloadState: (videoId: string) => import('../hooks/useDownloadManager').TrackDownloadState;
 }
 
 const OfflineItem: React.FC<{
@@ -24,7 +25,8 @@ const OfflineItem: React.FC<{
     isSynced: boolean;
     isSyncing: boolean;
     offlinePlaylist: VideoItem[];
-}> = ({ item, index, onSelectTrack, onRemoveFromOfflinePlaylist, onSelectChannel, isPlaying, isSynced, isSyncing, offlinePlaylist }) => {
+    downloadState: import('../hooks/useDownloadManager').TrackDownloadState;
+}> = ({ item, index, onSelectTrack, onRemoveFromOfflinePlaylist, onSelectChannel, isPlaying, isSynced, isSyncing, offlinePlaylist, downloadState }) => {
     
     return (
         <div className="grid grid-cols-[20px_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
@@ -60,8 +62,18 @@ const OfflineItem: React.FC<{
                 </div>
             </div>
             <div className="flex items-center space-x-3 flex-shrink-0">
+                <div className="w-24 hidden sm:block">
+                    {downloadState.status === 'downloading' && (
+                        <div className="w-full bg-dark-bg h-1 rounded-full overflow-hidden">
+                            <div 
+                                className="bg-brand-red h-full transition-all duration-300"
+                                style={{ width: `${downloadState.progress}%` }}
+                            ></div>
+                        </div>
+                    )}
+                </div>
                 <div className="w-6 flex justify-center">
-                    {isSyncing && !isSynced ? (
+                    {downloadState.status === 'downloading' ? (
                          <i className="fas fa-spinner fa-spin text-brand-red text-xs"></i>
                     ) : isSynced ? (
                         <i className="fas fa-check-circle text-green-500 text-xs" title="Tersedia offline"></i>
@@ -90,7 +102,8 @@ export const OfflineList: React.FC<OfflineListProps> = ({
     currentTrackId,
     isSyncing,
     onStartSync,
-    syncingTrackProgress
+    syncingTrackProgress,
+    getDownloadState
 }) => {
   
   const unsyncedCount = offlinePlaylist.filter(item => !syncedOfflineIds.includes(item.id.videoId)).length;
@@ -167,6 +180,7 @@ export const OfflineList: React.FC<OfflineListProps> = ({
                     isSynced={syncedOfflineIds.includes(item.id.videoId)}
                     isSyncing={isSyncing}
                     offlinePlaylist={offlinePlaylist}
+                    downloadState={getDownloadState(item.id.videoId)}
                 />
             ))}
         </div>

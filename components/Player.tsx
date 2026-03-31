@@ -1,5 +1,7 @@
 import React, { useEffect } from 'react';
 import type { VideoItem } from '../types';
+import { DownloadButton } from './DownloadButton';
+import type { TrackDownloadState } from '../hooks/useDownloadManager';
 
 interface PlayerProps {
   track: VideoItem;
@@ -18,6 +20,10 @@ interface PlayerProps {
   onToggleAutoplay: () => void;
   isShuffle: boolean;
   onToggleShuffle: () => void;
+  isLocalMode?: boolean;
+  downloadState: TrackDownloadState;
+  onDownload: () => void;
+  onDeleteDownload: () => void;
 }
 
 const formatTime = (seconds: number) => {
@@ -37,7 +43,8 @@ const vibrate = (duration: number = 20) => {
 export const Player: React.FC<PlayerProps> = ({
     track, isPlaying, setIsPlaying, onNext, onPrev, onToggleNowPlaying,
     onSelectChannel, volume, setVolume, currentTime, duration, seekTo,
-    isAutoplayEnabled, onToggleAutoplay, isShuffle, onToggleShuffle
+    isAutoplayEnabled, onToggleAutoplay, isShuffle, onToggleShuffle,
+    isLocalMode = false, downloadState, onDownload, onDeleteDownload,
 }) => {
     
     useEffect(() => {
@@ -124,6 +131,17 @@ export const Player: React.FC<PlayerProps> = ({
                     </div>
                 </div>
                 <div className="flex items-center space-x-2 flex-shrink-0 pl-2">
+                    {/* Offline badge for mobile */}
+                    {isLocalMode && (
+                        <span className="text-[9px] font-bold text-green-400 bg-green-900/40 border border-green-500/30 px-1.5 py-0.5 rounded">
+                            <i className="fas fa-wifi-slash mr-1" />OFFLINE
+                        </span>
+                    )}
+                    <DownloadButton
+                        state={downloadState}
+                        onDownload={onDownload}
+                        onDelete={onDeleteDownload}
+                    />
                     <button 
                         onClick={() => { setIsPlaying(!isPlaying); vibrate(20); }} 
                         className="w-10 h-10 flex items-center justify-center text-white"
@@ -180,10 +198,23 @@ export const Player: React.FC<PlayerProps> = ({
 
                 {/* Right: Volume & Options */}
                 <div className="flex items-center space-x-4 justify-end">
-                    <div className="hidden lg:flex items-center gap-1.5 px-2 py-1 bg-green-900/30 border border-green-500/30 rounded text-[10px] text-green-400 font-bold">
-                        <i className="fas fa-leaf"></i>
-                        DATA SAVER
-                    </div>
+                    {isLocalMode ? (
+                        <div className="hidden lg:flex items-center gap-1.5 px-2 py-1 bg-green-900/30 border border-green-500/30 rounded text-[10px] text-green-400 font-bold">
+                            <i className="fas fa-wifi-slash" />
+                            OFFLINE
+                        </div>
+                    ) : (
+                        <div className="hidden lg:flex items-center gap-1.5 px-2 py-1 bg-green-900/30 border border-green-500/30 rounded text-[10px] text-green-400 font-bold">
+                            <i className="fas fa-leaf" />
+                            DATA SAVER
+                        </div>
+                    )}
+                    <DownloadButton
+                        state={downloadState}
+                        onDownload={onDownload}
+                        onDelete={onDeleteDownload}
+                        size="md"
+                    />
                     <button
                         onClick={() => { onToggleAutoplay(); vibrate(15); }}
                         title={isAutoplayEnabled ? "Matikan Putar Otomatis" : "Aktifkan Putar Otomatis"}

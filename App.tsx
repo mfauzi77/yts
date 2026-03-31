@@ -5,6 +5,8 @@ import { getChannelVideos, getRelatedVideos, searchVideos, getChannelPlaylists, 
 import { useLocalStorage } from './hooks/useLocalStorage';
 import type { VideoItem, Playlist, YouTubePlaylist } from './types';
 import { useYouTubePlayer } from './hooks/useYouTubePlayer';
+import { useOfflinePlayer } from './hooks/useOfflinePlayer';
+import { useDownloadManager } from './hooks/useDownloadManager';
 import { ApiStatusIndicator } from './components/ApiStatusIndicator';
 import { LandingPage } from './components/LandingPage';
 import { Sidebar } from './components/Sidebar';
@@ -77,49 +79,74 @@ const App: React.FC = () => {
     const [isSyncing, setIsSyncing] = useState(false);
     const [syncingTrackProgress, setSyncingTrackProgress] = useState<number>(0);
 
+    // --- Download Manager ---
+    const { downloadTrack, deleteOfflineTrack, getDownloadState, savedIds, refreshSavedIds } = useDownloadManager();
+
     const handleApiError = (err: unknown) => {
         const message = err instanceof Error ? err.message : 'Terjadi galat.';
         setError(message);
         setApiStatus('error');
     };
 
-    // Logic Sinkronisasi Offline yang diperbarui
-    const startOfflineSync = useCallback(async () => {
-        if (isSyncing || offlineItems.length === 0) return;
+    const handleAddToOffline = useCallback((track: VideoItem) => {
+        setOfflineItems(prev => {
+            const alreadyExists = prev.some(item => item.id.videoId === track.id.videoId);
+            if (alreadyExists) return prev;
+            return [track, ...prev];
+        });
+    }, [setOfflineItems]);
+
+    const handleDownloadTrack = useCallback(async (track: VideoItem) => {
+        // Otomatis tambahkan ke list metadata offline jika belum ada
+        handleAddToOffline(track);
+        // Jalankan download audio
+        await downloadTrack(track);
+    }, [handleAddToOffline, downloadTrack]);
+
+    // Logic Sinkronisasi Offline yang diperbarui: Unduh Audio + Metadata
+    const startOfflineSync = useCallback(async (itemsToSync: VideoItem[] = offlineItems) => {
+        if (isSyncing || itemsToSync.length === 0) return;
         
         setIsSyncing(true);
         setSyncingTrackProgress(0);
         
-        const unsyncedItems = offlineItems.filter(item => !syncedOfflineIds.includes(item.id.videoId));
+        // Cek mana yang benar-benar belum tersimpan di IndexedDB
+        // Gunakan set dari useDownloadManager (savedIds) untuk akurasi
+        const unsyncedItems = itemsToSync.filter(item => !savedIds.has(item.id.videoId));
         
         if (unsyncedItems.length === 0) {
             setIsSyncing(false);
+            setApiStatus('success');
             return;
         }
 
         let completed = 0;
         for (const item of unsyncedItems) {
             try {
-                // 1. Trigger Thumbnail Cache melalui fetch (Service Worker akan menangkapnya)
-                const imgUrl = item.snippet.thumbnails.default.url;
-                await fetch(imgUrl, { mode: 'no-cors' });
+                // 1. Download file audio asli ke IndexedDB
+                await handleDownloadTrack(item);
                 
-                // 2. Tandai sebagai tersinkronisasi
+                // 2. Tandai sebagai tersinkronisasi di localStorage (Legacy/Metadata marker)
                 setSyncedOfflineIds(prev => [...new Set([...prev, item.id.videoId])]);
                 
                 completed++;
                 setSyncingTrackProgress((completed / unsyncedItems.length) * 100);
-                
-                // Jeda kecil agar tidak memberatkan browser
-                await new Promise(r => setTimeout(r, 500));
             } catch (err) {
-                console.error("Gagal sinkronisasi item:", item.snippet.title);
+                console.error("Gagal sinkronisasi item:", item.snippet.title, err);
             }
         }
         
         setIsSyncing(false);
         setSyncingTrackProgress(100);
-    }, [isSyncing, offlineItems, syncedOfflineIds, setSyncedOfflineIds]);
+        refreshSavedIds(itemsToSync.map(i => i.id.videoId));
+    }, [isSyncing, offlineItems, savedIds, handleDownloadTrack, setSyncedOfflineIds, refreshSavedIds]);
+    
+    // Inisialisasi: Cek status offline saat aplikasi dimuat atau offlineItems berubah
+    useEffect(() => {
+        if (offlineItems.length > 0) {
+            refreshSavedIds(offlineItems.map(i => i.id.videoId));
+        }
+    }, [offlineItems, refreshSavedIds]);
 
     useEffect(() => {
         if (apiStatus === 'success' || apiStatus === 'error') {
@@ -259,11 +286,25 @@ const App: React.FC = () => {
         }
     }, [playNext, isAutoplayEnabled]);
 
-    const { volume, setVolume, seekTo, currentTime, duration } = useYouTubePlayer({
+    // --- Offline / Local Playback --- (declared first so useYouTubePlayer can reference isLocalMode)
+    const offlinePlayerData = useOfflinePlayer({
         videoId: currentTrack?.id.videoId ?? null,
         isPlaying,
+        onEnded: playNext,
+    });
+
+    const { volume, setVolume, seekTo, currentTime, duration } = useYouTubePlayer({
+        videoId: currentTrack?.id.videoId ?? null,
+        isPlaying: isPlaying && !offlinePlayerData.isLocalMode,
         onStateChange: handlePlayerStateChange,
     });
+
+    // Merge: if local mode, override time/duration/seek/volume
+    const activeCurrentTime = offlinePlayerData.isLocalMode ? offlinePlayerData.localCurrentTime : currentTime;
+    const activeDuration    = offlinePlayerData.isLocalMode ? offlinePlayerData.localDuration    : duration;
+    const activeSeekTo      = offlinePlayerData.isLocalMode ? offlinePlayerData.localSeekTo      : seekTo;
+    const activeVolume      = offlinePlayerData.isLocalMode ? offlinePlayerData.localVolume      : volume;
+    const activeSetVolume   = offlinePlayerData.isLocalMode ? offlinePlayerData.localSetVolume   : setVolume;
 
     const handleOpenAddToPlaylistModal = (track: VideoItem) => setModalTrack(track);
     const handleCloseAddToPlaylistModal = () => setModalTrack(null);
@@ -287,14 +328,6 @@ const App: React.FC = () => {
         setLikedSongs(prev => prev.includes(track.id.videoId) ? prev.filter(id => id !== track.id.videoId) : [...prev, track.id.videoId]);
     }, [setLikedSongs]);
 
-    const handleAddToOffline = useCallback((track: VideoItem) => {
-        setOfflineItems(prev => {
-            const alreadyExists = prev.some(item => item.id.videoId === track.id.videoId);
-            if (alreadyExists) return prev;
-            return [track, ...prev];
-        });
-        // Berikan notifikasi kecil atau feedback visual jika perlu
-    }, [setOfflineItems]);
 
     const handleSelectChannel = useCallback(async (channelId: string, channelTitle: string) => {
         setIsChannelLoading(true);
@@ -348,6 +381,9 @@ const App: React.FC = () => {
                     offlineItems={offlineItems}
                     onAddToOffline={handleAddToOffline}
                     currentTrackId={currentTrack?.id.videoId}
+                    getDownloadState={getDownloadState}
+                    onDownloadTrack={handleDownloadTrack}
+                    onDeleteDownload={deleteOfflineTrack}
                 />;
 
             case 'playlists':
@@ -373,6 +409,12 @@ const App: React.FC = () => {
                     onBack={() => setActiveView('playlists')}
                     onDelete={() => { setPlaylists(p => p.filter(pl => pl.id !== activePlaylist.id)); setActiveView('playlists'); }}
                     onRename={(newName) => setPlaylists(p => p.map(pl => pl.id === activePlaylist.id ? {...pl, name: newName} : pl))}
+                    getDownloadState={getDownloadState}
+                    onDownloadTrack={handleDownloadTrack}
+                    onDeleteDownload={deleteOfflineTrack}
+                    isSyncing={isSyncing}
+                    onStartSync={() => startOfflineSync(activePlaylist.tracks)}
+                    syncingTrackProgress={syncingTrackProgress}
                 />;
             case 'history':
                 return <HistoryList
@@ -383,13 +425,17 @@ const App: React.FC = () => {
                     offlineItems={offlineItems}
                     onAddToOffline={handleAddToOffline}
                     currentTrackId={currentTrack?.id.videoId}
+                    getDownloadState={getDownloadState}
+                    onDownloadTrack={handleDownloadTrack}
+                    onDeleteDownload={deleteOfflineTrack}
                 />;
             case 'offline':
                  return <OfflineList
                     offlinePlaylist={offlineItems}
-                    syncedOfflineIds={syncedOfflineIds}
+                    syncedOfflineIds={[...savedIds]}
                     onSelectTrack={handleSelectTrack}
                     onRemoveFromOfflinePlaylist={(id) => {
+                        deleteOfflineTrack(id);
                         setOfflineItems(p => p.filter(i => i.id.videoId !== id));
                         setSyncedOfflineIds(p => p.filter(sid => sid !== id));
                     }}
@@ -398,6 +444,7 @@ const App: React.FC = () => {
                     isSyncing={isSyncing}
                     onStartSync={startOfflineSync}
                     syncingTrackProgress={syncingTrackProgress}
+                    getDownloadState={getDownloadState}
                 />;
             case 'channel':
                 if (!selectedChannel) return null;
@@ -416,6 +463,9 @@ const App: React.FC = () => {
                     currentTrackId={currentTrack?.id.videoId}
                     onLoadMore={() => {}}
                     hasNextPage={!!channelNextPageToken}
+                    getDownloadState={getDownloadState}
+                    onDownloadTrack={handleDownloadTrack}
+                    onDeleteDownload={deleteOfflineTrack}
                 />;
             case 'youtubePlaylistDetail':
                 if (!selectedYouTubePlaylist) return null;
@@ -439,6 +489,12 @@ const App: React.FC = () => {
                     onDelete={() => {}} // Cannot delete YouTube playlist
                     onRename={() => {}} // Cannot rename YouTube playlist
                     isYouTubePlaylist={true}
+                    getDownloadState={getDownloadState}
+                    onDownloadTrack={handleDownloadTrack}
+                    onDeleteDownload={deleteOfflineTrack}
+                    isSyncing={isSyncing}
+                    onStartSync={() => startOfflineSync(selectedYouTubePlaylist.tracks)}
+                    syncingTrackProgress={syncingTrackProgress}
                 />;
             default: return null;
         }
@@ -514,16 +570,20 @@ const App: React.FC = () => {
                                 onNext={playNext}
                                 onPrev={playPrev}
                                 onToggleNowPlaying={() => setIsNowPlayingViewOpen(true)}
-                                volume={volume}
-                                setVolume={setVolume}
-                                currentTime={currentTime}
-                                duration={duration}
-                                seekTo={seekTo}
+                                volume={activeVolume}
+                                setVolume={activeSetVolume}
+                                currentTime={activeCurrentTime}
+                                duration={activeDuration}
+                                seekTo={activeSeekTo}
                                 onSelectChannel={handleSelectChannel}
                                 isAutoplayEnabled={isAutoplayEnabled}
                                 onToggleAutoplay={() => setIsAutoplayEnabled(p => !p)}
                                 isShuffle={isShuffle}
                                 onToggleShuffle={() => setIsShuffle(p => !p)}
+                                isLocalMode={offlinePlayerData.isLocalMode}
+                                downloadState={getDownloadState(currentTrack.id.videoId)}
+                                onDownload={() => handleDownloadTrack(currentTrack)}
+                                onDeleteDownload={() => deleteOfflineTrack(currentTrack.id.videoId)}
                             />
                         </footer>
                     )}
@@ -539,17 +599,21 @@ const App: React.FC = () => {
                             setIsPlaying={setIsPlaying}
                             onNext={playNext}
                             onPrev={playPrev}
-                            volume={volume}
-                            setVolume={setVolume}
-                            currentTime={currentTime}
-                            duration={duration}
-                            seekTo={seekTo}
+                            volume={activeVolume}
+                            setVolume={activeSetVolume}
+                            currentTime={activeCurrentTime}
+                            duration={activeDuration}
+                            seekTo={activeSeekTo}
                             isAutoplayEnabled={isAutoplayEnabled}
                             onToggleAutoplay={() => setIsAutoplayEnabled(p => !p)}
                             isShuffle={isShuffle}
                             onToggleShuffle={() => setIsShuffle(p => !p)}
                             isLiked={likedSongs.includes(currentTrack.id.videoId)}
                             onToggleLike={() => handleToggleLike(currentTrack)}
+                            isLocalMode={offlinePlayerData.isLocalMode}
+                            downloadState={getDownloadState(currentTrack.id.videoId)}
+                            onDownload={() => handleDownloadTrack(currentTrack)}
+                            onDeleteDownload={() => deleteOfflineTrack(currentTrack.id.videoId)}
                         >
                             {isAutoplayBlocked && (
                                 <AutoplayOverlay track={currentTrack} onForcePlay={() => setIsPlaying(true)} />

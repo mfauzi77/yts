@@ -10,8 +10,10 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@distube/ytdl-core": "^4.16.12",
     "cors": "^2.8.6",
     "express": "^4.22.1",
+    "idb-keyval": "^6.2.2",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },

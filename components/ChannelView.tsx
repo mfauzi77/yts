@@ -1,6 +1,8 @@
 
 import React, { useState } from 'react';
 import type { VideoItem, YouTubePlaylist } from '../types';
+import { DownloadButton } from './DownloadButton';
+import type { TrackDownloadState } from '../hooks/useDownloadManager';
 
 interface ChannelViewProps {
   channelTitle: string;
@@ -17,17 +19,21 @@ interface ChannelViewProps {
   currentTrackId?: string | null;
   onLoadMore: () => void;
   hasNextPage: boolean;
+  getDownloadState: (videoId: string) => TrackDownloadState;
+  onDownloadTrack: (track: VideoItem) => void;
+  onDeleteDownload: (videoId: string) => void;
 }
 
 const ChannelVideoItem: React.FC<{
     item: VideoItem;
     onSelectTrack: (track: VideoItem, contextList: VideoItem[]) => void;
     onOpenAddToPlaylistModal: (track: VideoItem) => void;
-    isOffline: boolean;
-    onAddToOffline: (track: VideoItem) => void;
     isPlaying: boolean;
     videoList: VideoItem[];
-}> = ({ item, onSelectTrack, onOpenAddToPlaylistModal, isOffline, onAddToOffline, isPlaying, videoList }) => (
+    downloadState: TrackDownloadState;
+    onDownload: () => void;
+    onDeleteDownload: () => void;
+}> = ({ item, onSelectTrack, onOpenAddToPlaylistModal, isPlaying, videoList, downloadState, onDownload, onDeleteDownload }) => (
     <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
         <div className="relative w-12 h-12">
             <img
@@ -52,19 +58,14 @@ const ChannelVideoItem: React.FC<{
             </p>
         </div>
         <div className="flex items-center space-x-1 flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-            <button
-                onClick={() => onAddToOffline(item)}
-                disabled={isOffline}
-                className={`p-2 w-10 rounded-full transition-colors duration-200 ${
-                    isOffline ? 'text-green-500' : 'text-dark-subtext hover:text-white'
-                }`}
-                title={isOffline ? "Disimpan offline" : "Simpan untuk offline"}
-            >
-                <i className={`fas ${isOffline ? 'fa-check-circle' : 'fa-cloud-download-alt'}`}></i>
-            </button>
+            <DownloadButton
+                state={downloadState}
+                onDownload={onDownload}
+                onDelete={onDeleteDownload}
+            />
             <button
                 onClick={() => onOpenAddToPlaylistModal(item)}
-                className="p-2 w-10 rounded-full text-dark-subtext hover:text-white transition-colors duration-200"
+                className="p-2 w-8 h-8 flex items-center justify-center rounded-full text-dark-subtext hover:text-white transition-colors duration-200"
                 title="Tambahkan ke playlist"
             >
                 <i className="fas fa-plus"></i>
@@ -120,6 +121,9 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
     currentTrackId,
     onLoadMore,
     hasNextPage,
+    getDownloadState,
+    onDownloadTrack,
+    onDeleteDownload,
 }) => {
     const [activeTab, setActiveTab] = useState<'videos' | 'playlists'>('videos');
 

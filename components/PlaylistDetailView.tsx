@@ -1,5 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { DownloadButton } from './DownloadButton';
+import type { TrackDownloadState } from '../hooks/useDownloadManager';
 import type { VideoItem, Playlist } from '../types';
 
 interface PlaylistDetailViewProps {
@@ -18,6 +20,12 @@ interface PlaylistDetailViewProps {
   onDelete: () => void;
   onRename: (newName: string) => void;
   isYouTubePlaylist?: boolean;
+  getDownloadState: (videoId: string) => TrackDownloadState;
+  onDownloadTrack: (track: VideoItem) => void;
+  onDeleteDownload: (videoId: string) => void;
+  isSyncing: boolean;
+  onStartSync: () => void;
+  syncingTrackProgress: number;
 }
 
 const PlaylistItem: React.FC<{
@@ -27,11 +35,12 @@ const PlaylistItem: React.FC<{
     onRemoveFromPlaylist: (trackId: string) => void;
     onSelectChannel: (channelId: string, channelTitle: string) => void;
     isPlaying: boolean;
-    isOffline: boolean;
-    onAddToOffline: (track: VideoItem) => void;
     playlistTracks: VideoItem[];
     isYouTubePlaylist?: boolean;
-}> = ({ item, index, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, isPlaying, isOffline, onAddToOffline, playlistTracks, isYouTubePlaylist }) => (
+    downloadState: TrackDownloadState;
+    onDownload: () => void;
+    onDeleteDownload: () => void;
+}> = ({ item, index, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, isPlaying, playlistTracks, isYouTubePlaylist, downloadState, onDownload, onDeleteDownload }) => (
     <div className="grid grid-cols-[20px_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
         <div className="flex items-center justify-center text-dark-subtext">
             <span className="group-hover:hidden">{index + 1}</span>
@@ -58,16 +67,11 @@ const PlaylistItem: React.FC<{
             </div>
         </div>
         <div className="flex items-center space-x-1 flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-             <button
-                onClick={() => onAddToOffline(item)}
-                disabled={isOffline}
-                className={`p-2 w-10 rounded-full transition-colors duration-200 ${
-                    isOffline ? 'text-green-500' : 'text-dark-subtext hover:text-white'
-                }`}
-                title={isOffline ? "Disimpan offline" : "Simpan untuk offline"}
-            >
-                <i className={`fas ${isOffline ? 'fa-check-circle' : 'fa-cloud-download-alt'}`}></i>
-            </button>
+            <DownloadButton
+                state={downloadState}
+                onDownload={onDownload}
+                onDelete={onDeleteDownload}
+            />
             {!isYouTubePlaylist && (
                 <button onClick={() => onRemoveFromPlaylist(item.id.videoId)} className="p-2 w-10 rounded-full text-dark-subtext hover:text-white" title="Hapus dari playlist">
                     <i className="fas fa-trash-alt"></i>
@@ -151,7 +155,7 @@ const PlaylistHeader: React.FC<{
 };
 
 
-export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, currentTrackId, isAutoplayEnabled, onToggleAutoplay, isShuffle, onToggleShuffle, offlineItems, onAddToOffline, onBack, onDelete, onRename, isYouTubePlaylist }) => {
+export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, currentTrackId, isAutoplayEnabled, onToggleAutoplay, isShuffle, onToggleShuffle, offlineItems, onAddToOffline, onBack, onDelete, onRename, isYouTubePlaylist, getDownloadState, onDownloadTrack, onDeleteDownload, isSyncing, onStartSync, syncingTrackProgress }) => {
   if (!playlist) return null;
 
   if (playlist.tracks.length === 0) {
@@ -170,7 +174,23 @@ export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist
   return (
     <div>
         <PlaylistHeader playlist={playlist} onBack={onBack} onDelete={onDelete} onRename={onRename} isYouTubePlaylist={isYouTubePlaylist} />
-        <div className="flex flex-wrap items-center justify-end gap-6 mb-4 pr-2">
+        <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-3 mb-6 pr-2">
+            <button
+                onClick={onStartSync}
+                disabled={isSyncing}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all duration-300 ${
+                    isSyncing 
+                    ? 'bg-dark-highlight text-dark-subtext cursor-not-allowed' 
+                    : 'bg-white text-black hover:bg-brand-red hover:text-white shadow-lg active:scale-95'
+                }`}
+            >
+                {isSyncing ? (
+                    <><i className="fas fa-spinner fa-spin"></i> Mensinkronkan...</>
+                ) : (
+                    <><i className="fas fa-sync-alt"></i> Simpan Semua</>
+                )}
+            </button>
+
             <div className="flex items-center">
                 <span className="mr-3 text-sm font-medium text-dark-subtext">Acak</span>
                 <label className="relative inline-flex items-center cursor-pointer">
@@ -186,10 +206,24 @@ export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist
                 </label>
             </div>
         </div>
+
+        {/* Global Progress Bar for Syncing */}
+        {isSyncing && syncingTrackProgress > 0 && syncingTrackProgress < 100 && (
+            <div className="mb-6 px-2">
+                <div className="flex justify-between text-xs text-dark-subtext mb-1">
+                    <span>Sedang mengunduh playlist...</span>
+                    <span>{Math.round(syncingTrackProgress)}%</span>
+                </div>
+                <div className="w-full bg-dark-card h-1.5 rounded-full overflow-hidden">
+                    <div 
+                        className="bg-brand-red h-full transition-all duration-500 ease-out shadow-[0_0_8px_rgba(255,0,0,0.5)]"
+                        style={{ width: `${syncingTrackProgress}%` }}
+                    ></div>
+                </div>
+            </div>
+        )}
         <div className="space-y-1">
-          {playlist.tracks.map((item, index) => {
-            const isOffline = offlineItems.some(o => o.id.videoId === item.id.videoId);
-            return (
+          {playlist.tracks.map((item, index) => (
                 <PlaylistItem 
                     key={item.id.videoId} 
                     item={item}
@@ -198,13 +232,14 @@ export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist
                     onRemoveFromPlaylist={onRemoveFromPlaylist}
                     onSelectChannel={onSelectChannel}
                     isPlaying={currentTrackId === item.id.videoId}
-                    isOffline={isOffline}
-                    onAddToOffline={onAddToOffline}
                     playlistTracks={playlist.tracks}
                     isYouTubePlaylist={isYouTubePlaylist}
+                    downloadState={getDownloadState(item.id.videoId)}
+                    onDownload={() => onDownloadTrack(item)}
+                    onDeleteDownload={() => onDeleteDownload(item.id.videoId)}
                 />
-            )
-          })}
+                ))
+          }
         </div>
     </div>
   );

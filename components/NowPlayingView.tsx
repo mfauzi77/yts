@@ -1,6 +1,7 @@
 import React, { useState, useEffect, lazy, Suspense, useRef } from 'react';
 import type { VideoItem } from '../types';
 import { FloatingParticles } from './FloatingParticles';
+import { DownloadButton } from './DownloadButton';
 
 // Lazy load child components
 const AudioVisualizerCanvas = lazy(() => import('./AudioVisualizerCanvas').then(m => ({ default: m.AudioVisualizerCanvas })));
@@ -27,6 +28,10 @@ interface NowPlayingViewProps {
   children?: React.ReactNode;
   isLiked: boolean;
   onToggleLike: () => void;
+  isLocalMode?: boolean;
+  downloadState?: import('../hooks/useDownloadManager').TrackDownloadState;
+  onDownload?: () => void;
+  onDeleteDownload?: () => void;
 }
 
 const formatTime = (seconds: number) => {
@@ -43,7 +48,8 @@ const ViewPlaceholder: React.FC = () => (
 export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
     isOpen, onClose, track, isPlaying, setIsPlaying, onNext, onPrev,
     volume, setVolume, currentTime, duration, seekTo, isAutoplayEnabled, onToggleAutoplay, isShuffle, onToggleShuffle,
-    children, isLiked, onToggleLike
+    children, isLiked, onToggleLike,
+    isLocalMode = false, downloadState, onDownload, onDeleteDownload
 }) => {
     const [showVisualizer, setShowVisualizer] = useState(false);
     const [showVisualEffect, setShowVisualEffect] = useState(false);
@@ -99,10 +105,10 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
                 
                 {/* Album Art / Lyrics Container */}
                 <div className="relative z-20 transition-all duration-300 ease-in-out shadow-2xl w-full max-w-[350px] md:max-w-lg mx-auto aspect-square max-h-[50vh] md:max-h-[60vh] mb-8">
-                    {/* Data Saver Badge */}
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-lg">
-                        <i className="fas fa-leaf"></i>
-                        PENGHEMAT DATA AKTIF
+                    {/* Status Badge */}
+                    <div className={`absolute -top-3 left-1/2 -translate-x-1/2 z-30 ${isLocalMode ? 'bg-green-600' : 'bg-blue-600'} text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-lg`}>
+                        <i className={`fas ${isLocalMode ? 'fa-wifi-slash' : 'fa-leaf'}`}></i>
+                        {isLocalMode ? 'PUTAR OFFLINE' : 'PENGHEMAT DATA AKTIF'}
                     </div>
                    <Suspense fallback={<ViewPlaceholder />}>
                         {viewMode === 'lyrics' ? (
@@ -130,13 +136,24 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
                             <h1 className="text-xl md:text-2xl font-bold text-white truncate leading-tight" title={track.snippet.title}>{track.snippet.title}</h1>
                             <p className="text-sm md:text-base text-gray-400 mt-1 truncate">{track.snippet.channelTitle}</p>
                         </div>
-                        <button 
-                            onClick={onToggleLike}
-                            className={`w-12 h-12 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors flex-shrink-0 ml-4 ${isLiked ? 'text-brand-red' : 'text-white/60'}`}
-                            title={isLiked ? "Batal Suka" : "Suka"}
-                        >
-                            <i className={`${isLiked ? 'fas' : 'far'} fa-heart text-2xl`}></i>
-                        </button>
+                        <div className="flex items-center gap-4">
+                            {downloadState && onDownload && onDeleteDownload && (
+                                <div className="bg-white/5 p-1 rounded-full border border-white/10">
+                                    <DownloadButton
+                                        state={downloadState}
+                                        onDownload={onDownload}
+                                        onDelete={onDeleteDownload}
+                                    />
+                                </div>
+                            )}
+                            <button 
+                                onClick={onToggleLike}
+                                className={`w-12 h-12 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors flex-shrink-0 ${isLiked ? 'text-brand-red' : 'text-white/60'}`}
+                                title={isLiked ? "Batal Suka" : "Suka"}
+                            >
+                                <i className={`${isLiked ? 'fas' : 'far'} fa-heart text-2xl`}></i>
+                            </button>
+                        </div>
                     </div>
 
                     <div className="space-y-2 mb-6 md:mb-8">
