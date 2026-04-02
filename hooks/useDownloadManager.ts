@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect } from 'react';
-import { downloadTrackAudio, isTrackOffline, removeTrackOffline } from '../services/offlineService';
 import type { VideoItem } from '../types';
 
 export type DownloadStatus = 'idle' | 'downloading' | 'done' | 'error';

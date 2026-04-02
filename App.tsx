@@ -21,12 +21,11 @@ const PlaylistListView = lazy(() => import('./components/Playlist').then(m => ({
 const HistoryList = lazy(() => import('./components/HistoryList').then(m => ({ default: m.HistoryList })));
 const NowPlayingView = lazy(() => import('./components/NowPlayingView').then(m => ({ default: m.NowPlayingView })));
 const ChannelView = lazy(() => import('./components/ChannelView').then(m => ({ default: m.ChannelView })));
-const OfflineList = lazy(() => import('./components/OfflineList').then(m => ({ default: m.OfflineList })));
 const AddToPlaylistModal = lazy(() => import('./components/AddToPlaylistModal').then(m => ({ default: m.AddToPlaylistModal })));
 const PlaylistDetailView = lazy(() => import('./components/PlaylistDetailView').then(m => ({ default: m.PlaylistDetailView })));
 
 
-type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'offline' | 'channel' | 'youtubePlaylistDetail';
+type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'channel' | 'youtubePlaylistDetail';
 type ApiStatus = 'idle' | 'success' | 'error';
 
 const LoadingSpinner: React.FC = () => (
@@ -76,8 +75,6 @@ const App: React.FC = () => {
     const [activePlaybackList, setActivePlaybackList] = useState<VideoItem[]>([]);
     const currentTrackIndexRef = React.useRef(-1);
     
-    const [isSyncing, setIsSyncing] = useState(false);
-    const [syncingTrackProgress, setSyncingTrackProgress] = useState<number>(0);
 
     // --- Download Manager ---
     const { downloadTrack, deleteOfflineTrack, getDownloadState, savedIds, refreshSavedIds } = useDownloadManager();
@@ -103,43 +100,7 @@ const App: React.FC = () => {
         await downloadTrack(track);
     }, [handleAddToOffline, downloadTrack]);
 
-    // Logic Sinkronisasi Offline yang diperbarui: Unduh Audio + Metadata
-    const startOfflineSync = useCallback(async (itemsToSync: VideoItem[] = offlineItems) => {
-        if (isSyncing || itemsToSync.length === 0) return;
-        
-        setIsSyncing(true);
-        setSyncingTrackProgress(0);
-        
-        // Cek mana yang benar-benar belum tersimpan di IndexedDB
-        // Gunakan set dari useDownloadManager (savedIds) untuk akurasi
-        const unsyncedItems = itemsToSync.filter(item => !savedIds.has(item.id.videoId));
-        
-        if (unsyncedItems.length === 0) {
-            setIsSyncing(false);
-            setApiStatus('success');
-            return;
-        }
 
-        let completed = 0;
-        for (const item of unsyncedItems) {
-            try {
-                // 1. Download file audio asli ke IndexedDB
-                await handleDownloadTrack(item);
-                
-                // 2. Tandai sebagai tersinkronisasi di localStorage (Legacy/Metadata marker)
-                setSyncedOfflineIds(prev => [...new Set([...prev, item.id.videoId])]);
-                
-                completed++;
-                setSyncingTrackProgress((completed / unsyncedItems.length) * 100);
-            } catch (err) {
-                console.error("Gagal sinkronisasi item:", item.snippet.title, err);
-            }
-        }
-        
-        setIsSyncing(false);
-        setSyncingTrackProgress(100);
-        refreshSavedIds(itemsToSync.map(i => i.id.videoId));
-    }, [isSyncing, offlineItems, savedIds, handleDownloadTrack, setSyncedOfflineIds, refreshSavedIds]);
     
     // Inisialisasi: Cek status offline saat aplikasi dimuat atau offlineItems berubah
     useEffect(() => {
@@ -412,9 +373,6 @@ const App: React.FC = () => {
                     getDownloadState={getDownloadState}
                     onDownloadTrack={handleDownloadTrack}
                     onDeleteDownload={deleteOfflineTrack}
-                    isSyncing={isSyncing}
-                    onStartSync={() => startOfflineSync(activePlaylist.tracks)}
-                    syncingTrackProgress={syncingTrackProgress}
                 />;
             case 'history':
                 return <HistoryList
@@ -429,23 +387,7 @@ const App: React.FC = () => {
                     onDownloadTrack={handleDownloadTrack}
                     onDeleteDownload={deleteOfflineTrack}
                 />;
-            case 'offline':
-                 return <OfflineList
-                    offlinePlaylist={offlineItems}
-                    syncedOfflineIds={[...savedIds]}
-                    onSelectTrack={handleSelectTrack}
-                    onRemoveFromOfflinePlaylist={(id) => {
-                        deleteOfflineTrack(id);
-                        setOfflineItems(p => p.filter(i => i.id.videoId !== id));
-                        setSyncedOfflineIds(p => p.filter(sid => sid !== id));
-                    }}
-                    onSelectChannel={handleSelectChannel}
-                    currentTrackId={currentTrack?.id.videoId}
-                    isSyncing={isSyncing}
-                    onStartSync={startOfflineSync}
-                    syncingTrackProgress={syncingTrackProgress}
-                    getDownloadState={getDownloadState}
-                />;
+
             case 'channel':
                 if (!selectedChannel) return null;
                 return <ChannelView
@@ -492,9 +434,6 @@ const App: React.FC = () => {
                     getDownloadState={getDownloadState}
                     onDownloadTrack={handleDownloadTrack}
                     onDeleteDownload={deleteOfflineTrack}
-                    isSyncing={isSyncing}
-                    onStartSync={() => startOfflineSync(selectedYouTubePlaylist.tracks)}
-                    syncingTrackProgress={syncingTrackProgress}
                 />;
             default: return null;
         }
@@ -505,7 +444,6 @@ const App: React.FC = () => {
 
         playlists: 'Playlist',
         history: 'Riwayat',
-        offline: 'Offline',
     };
 
     return (

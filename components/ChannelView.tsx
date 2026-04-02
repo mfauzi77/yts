@@ -167,10 +167,11 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                     item={item}
                                     onSelectTrack={onSelectTrack}
                                     onOpenAddToPlaylistModal={onOpenAddToPlaylistModal}
-                                    isOffline={offlineItems.some(o => o.id.videoId === item.id.videoId)}
-                                    onAddToOffline={onAddToOffline}
                                     isPlaying={currentTrackId === item.id.videoId}
                                     videoList={videos}
+                                    downloadState={getDownloadState(item.id.videoId)}
+                                    onDownload={() => onDownloadTrack(item)}
+                                    onDeleteDownload={() => onDeleteDownload(item.id.videoId)}
                                />
                            ))}
                            

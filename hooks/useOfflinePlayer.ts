@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback, type RefObject } from 'react';
-import { getTrackBlobUrl, isTrackOffline } from '../services/offlineService';
 
 interface UseOfflinePlayerProps {
   videoId: string | null;
