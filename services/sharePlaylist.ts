@@ -5,12 +5,12 @@ const BASE_URL = 'https://yts-lovat.vercel.app';
 const SHARE_PARAM = 'share';
 
 // Versi minimal VideoItem yang disimpan di URL (kurangi ukuran)
+// th (thumbnail) TIDAK disimpan — direkonstruksi dari videoId
 interface MiniTrack {
   v: string;   // videoId
   t: string;   // title
   c: string;   // channelTitle
   ci: string;  // channelId
-  th: string;  // thumbnail url (default)
 }
 
 interface SharePayload {
@@ -24,12 +24,11 @@ function toMini(track: VideoItem): MiniTrack {
     t: track.snippet.title,
     c: track.snippet.channelTitle,
     ci: track.snippet.channelId,
-    th: track.snippet.thumbnails.default.url,
   };
 }
 
 function fromMini(mini: MiniTrack): VideoItem {
-  const thumbUrl = mini.th || `https://i.ytimg.com/vi/${mini.v}/default.jpg`;
+  const thumbUrl = `https://i.ytimg.com/vi/${mini.v}/default.jpg`;
   const mediumUrl = `https://i.ytimg.com/vi/${mini.v}/mqdefault.jpg`;
   return {
     kind: 'youtube#searchResult',

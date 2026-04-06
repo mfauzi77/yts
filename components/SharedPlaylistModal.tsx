@@ -81,8 +81,8 @@ export const SharedPlaylistModal: React.FC<SharedPlaylistModalProps> = ({
           )}
 
           {/* Track list preview */}
-          <div className="space-y-2 mb-6 max-h-48 overflow-y-auto">
-            {playlist.tracks.slice(0, 5).map((track, i) => (
+          <div className="space-y-2 mb-6 max-h-48 overflow-y-auto pr-2">
+            {playlist.tracks.map((track, i) => (
               <div key={track.id.videoId} className="flex items-center gap-3">
                 <span className="text-dark-subtext text-xs w-4 text-right flex-shrink-0">{i + 1}</span>
                 <img
@@ -96,11 +96,6 @@ export const SharedPlaylistModal: React.FC<SharedPlaylistModalProps> = ({
                 </div>
               </div>
             ))}
-            {remainingCount > 0 && (
-              <p className="text-dark-subtext text-xs text-center pt-1">
-                +{remainingCount} lagu lainnya
-              </p>
-            )}
           </div>
 
           {/* Action buttons */}
