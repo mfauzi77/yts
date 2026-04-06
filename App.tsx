@@ -13,6 +13,8 @@ import { Sidebar } from './components/Sidebar';
 import { BottomNavBar } from './components/BottomNavBar';
 import { ErrorDisplay } from './components/ErrorDisplay';
 import { AutoplayOverlay } from './components/AutoplayOverlay';
+import { SharedPlaylistModal } from './components/SharedPlaylistModal';
+import { getSharedPlaylistFromCurrentUrl, clearShareParam } from './services/sharePlaylist';
 
 // Lazy load components
 const Player = lazy(() => import('./components/Player').then(m => ({ default: m.Player })));
@@ -71,6 +73,7 @@ const App: React.FC = () => {
     
     const [activePlaylist, setActivePlaylist] = useState<Playlist | null>(null);
     const [modalTrack, setModalTrack] = useState<VideoItem | null>(null);
+    const [sharedPlaylist, setSharedPlaylist] = useState<Playlist | null>(null);
 
     const [activePlaybackList, setActivePlaybackList] = useState<VideoItem[]>([]);
     const currentTrackIndexRef = React.useRef(-1);
@@ -78,6 +81,15 @@ const App: React.FC = () => {
 
     // --- Download Manager ---
     const { downloadTrack, deleteOfflineTrack, getDownloadState, savedIds, refreshSavedIds } = useDownloadManager();
+
+    // --- Shared Playlist via URL ---
+    useEffect(() => {
+        const parsed = getSharedPlaylistFromCurrentUrl();
+        if (parsed && parsed.tracks.length > 0) {
+            setSharedPlaylist(parsed);
+            clearShareParam();
+        }
+    }, []);
 
     const handleApiError = (err: unknown) => {
         const message = err instanceof Error ? err.message : 'Terjadi galat.';
@@ -449,6 +461,40 @@ const App: React.FC = () => {
     return (
         <>
             {isLandingPageMounted && <LandingPage onEnter={handleEnterApp} isExiting={isAppEntered} />}
+
+            {/* Shared Playlist Modal */}
+            {sharedPlaylist && (
+                <SharedPlaylistModal
+                    playlist={sharedPlaylist}
+                    onListen={(pl) => {
+                        // Langsung mulai putar lagu pertama dari shared playlist
+                        if (pl.tracks.length > 0) {
+                            handleSelectTrack(pl.tracks[0], pl.tracks);
+                            // Masuk ke app jika belum
+                            if (!isAppEntered) handleEnterApp();
+                        }
+                        setSharedPlaylist(null);
+                    }}
+                    onAddToMyPlaylist={(pl) => {
+                        const newPlaylist: Playlist = {
+                            ...pl,
+                            id: `pl-shared-${Date.now()}`,
+                        };
+                        setPlaylists(prev => [newPlaylist, ...prev]);
+                        setSharedPlaylist(null);
+                        // Navigasi ke tab playlist
+                        setIsAppEntered(true);
+                        setTimeout(() => {
+                            setIsLandingPageMounted(false);
+                            setActiveView('playlists');
+                        }, 300);
+                    }}
+                    onDismiss={() => {
+                        setSharedPlaylist(null);
+                        if (!isAppEntered) handleEnterApp();
+                    }}
+                />
+            )}
             <Suspense fallback={null}>
                 {modalTrack && (
                     <AddToPlaylistModal

@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { DownloadButton } from './DownloadButton';
 import type { TrackDownloadState } from '../hooks/useDownloadManager';
 import type { VideoItem, Playlist } from '../types';
+import { encodePlaylistToUrl } from '../services/sharePlaylist';
 
 interface PlaylistDetailViewProps {
   playlist: Playlist;
@@ -87,6 +88,7 @@ const PlaylistHeader: React.FC<{
 }> = ({ playlist, onBack, onDelete, onRename, isYouTubePlaylist }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [title, setTitle] = useState(playlist.name);
+    const [shareToast, setShareToast] = useState<'idle' | 'copied' | 'error'>('idle');
     const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -116,11 +118,25 @@ const PlaylistHeader: React.FC<{
             setIsEditing(false);
         }
     };
+
+    const handleShare = async () => {
+        if (playlist.tracks.length === 0) return;
+        const url = encodePlaylistToUrl(playlist);
+        try {
+            await navigator.clipboard.writeText(url);
+            setShareToast('copied');
+        } catch {
+            // Fallback: buka prompt agar user bisa copy manual
+            prompt('Salin link share di bawah ini:', url);
+            setShareToast('copied');
+        }
+        setTimeout(() => setShareToast('idle'), 2500);
+    };
     
     return (
         <div className="flex-shrink-0 pt-6 pb-4 px-2 md:px-0 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-                <button onClick={onBack} className="p-2 mr-2 -ml-2 rounded-full hover:bg-dark-surface">
+            <div className="flex items-center gap-2 min-w-0">
+                <button onClick={onBack} className="p-2 mr-2 -ml-2 rounded-full hover:bg-dark-surface flex-shrink-0">
                     <i className="fas fa-arrow-left text-white"></i>
                 </button>
                 {isEditing && !isYouTubePlaylist ? (
@@ -131,7 +147,7 @@ const PlaylistHeader: React.FC<{
                         onChange={e => setTitle(e.target.value)}
                         onBlur={handleRename}
                         onKeyDown={handleKeyDown}
-                        className="text-3xl md:text-4xl font-bold text-white bg-transparent border-b-2 border-brand-red outline-none"
+                        className="text-3xl md:text-4xl font-bold text-white bg-transparent border-b-2 border-brand-red outline-none min-w-0"
                     />
                 ) : (
                     <h1 
@@ -142,11 +158,30 @@ const PlaylistHeader: React.FC<{
                     </h1>
                 )}
             </div>
-            {!isYouTubePlaylist && (
-                <button onClick={onDelete} className="p-2 rounded-full text-dark-subtext hover:text-brand-red hover:bg-dark-surface" title="Hapus playlist">
-                    <i className="fas fa-trash-alt"></i>
-                </button>
-            )}
+            <div className="flex items-center gap-1 flex-shrink-0">
+                {/* Share button — hanya untuk playlist lokal yg ada isinya */}
+                {!isYouTubePlaylist && playlist.tracks.length > 0 && (
+                    <div className="relative">
+                        <button
+                            onClick={handleShare}
+                            className="p-2 rounded-full text-dark-subtext hover:text-white hover:bg-dark-surface transition-colors"
+                            title="Bagikan playlist"
+                        >
+                            <i className={`fas ${shareToast === 'copied' ? 'fa-check text-green-400' : 'fa-share-alt'}`}></i>
+                        </button>
+                        {shareToast === 'copied' && (
+                            <div className="absolute right-0 top-full mt-1 z-50 whitespace-nowrap bg-dark-card border border-white/10 text-green-400 text-xs font-semibold px-3 py-1.5 rounded-lg shadow-lg pointer-events-none">
+                                Link disalin!
+                            </div>
+                        )}
+                    </div>
+                )}
+                {!isYouTubePlaylist && (
+                    <button onClick={onDelete} className="p-2 rounded-full text-dark-subtext hover:text-brand-red hover:bg-dark-surface transition-colors" title="Hapus playlist">
+                        <i className="fas fa-trash-alt"></i>
+                    </button>
+                )}
+            </div>
         </div>
     );
 };
