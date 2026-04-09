@@ -59,8 +59,9 @@ const App: React.FC = () => {
     const [isYoutubePlaylistLoading, setIsYoutubePlaylistLoading] = useState<boolean>(false);
 
     const [apiStatus, setApiStatus] = useState<ApiStatus>('idle');
-    const [isAppEntered, setIsAppEntered] = useState<boolean>(false);
-    const [isLandingPageMounted, setIsLandingPageMounted] = useState<boolean>(true);
+    const [isAppEntered, setIsAppEntered] = useState<boolean>(true);
+    const [isLandingPageMounted, setIsLandingPageMounted] = useState<boolean>(false);
+
     const [isAutoplayBlocked, setIsAutoplayBlocked] = useState<boolean>(false);
 
     const [playlists, setPlaylists] = useLocalStorage<Playlist[]>('ytas-playlists', []);
@@ -70,6 +71,8 @@ const App: React.FC = () => {
     const [isAutoplayEnabled, setIsAutoplayEnabled] = useLocalStorage<boolean>('ytas-autoplay', true);
     const [isShuffle, setIsShuffle] = useLocalStorage<boolean>('ytas-shuffle', false);
     const [likedSongs, setLikedSongs] = useLocalStorage<string[]>('ytas-liked-songs', []);
+    const [searchHistory, setSearchHistory] = useLocalStorage<string[]>('ytas-search-history', []);
+
     
     const [activePlaylist, setActivePlaylist] = useState<Playlist | null>(null);
     const [modalTrack, setModalTrack] = useState<VideoItem | null>(null);
@@ -128,25 +131,90 @@ const App: React.FC = () => {
         }
     }, [apiStatus]);
 
-    useEffect(() => {
+    const fetchPersonalizedRecommendations = useCallback(async () => {
         if (!isAppEntered) return;
-
-        const fetchRecommendations = async () => {
+        
+        setIsRecommendationsLoading(true);
+        try {
+            const seeds: { type: 'history' | 'playlist' | 'search', videoId?: string, query?: string, title?: string }[] = [];
+            
+            // Seed 1: Most Recent History
             if (history.length > 0) {
-                setIsRecommendationsLoading(true);
-                try {
-                    const results = await getRelatedVideos(history[0].id.videoId);
-                    setRecommendations(results.filter(v => v.id.videoId !== history[0].id.videoId));
-                    setApiStatus('success');
-                } catch (err) { handleApiError(err); } 
-                finally { setIsRecommendationsLoading(false); }
-            } else {
+                seeds.push({ 
+                    type: 'history', 
+                    videoId: history[0].id.videoId,
+                    title: history[0].snippet.title 
+                });
+            }
+
+            
+            // Seed 2: Random Playlist Track
+            const playlistsWithTracks = playlists.filter(p => p.tracks.length > 0);
+            if (playlistsWithTracks.length > 0) {
+                const randomPL = playlistsWithTracks[Math.floor(Math.random() * playlistsWithTracks.length)];
+                const randomTrack = randomPL.tracks[Math.floor(Math.random() * randomPL.tracks.length)];
+                seeds.push({ 
+                    type: 'playlist', 
+                    videoId: randomTrack.id.videoId,
+                    title: randomTrack.snippet.title
+                });
+            }
+
+
+            // Seed 3: Recent Search
+            if (searchHistory.length > 0) {
+                seeds.push({ type: 'search', query: searchHistory[0] });
+            }
+
+            if (seeds.length === 0) {
                 setRecommendations([]);
                 setIsRecommendationsLoading(false);
+                return;
             }
-        };
-        fetchRecommendations();
-    }, [history, isAppEntered]);
+
+            // Fetch from all sources
+            const results = await Promise.all(seeds.map(async seed => {
+                try {
+                    if (seed.type === 'search' && seed.query) {
+                        return await searchVideos(seed.query);
+                    } else if (seed.videoId) {
+                        return await getRelatedVideos(seed.videoId, seed.title);
+                    }
+
+                    return [];
+                } catch (e) { return []; }
+            }));
+
+            // Merge & Interleave
+            const interleaved: VideoItem[] = [];
+            const seenIds = new Set<string>();
+            history.slice(0, 10).forEach(h => seenIds.add(h.id.videoId));
+            if (currentTrack) seenIds.add(currentTrack.id.videoId);
+
+            const maxLen = Math.max(...results.map(r => r.length));
+            for (let i = 0; i < maxLen; i++) {
+                for (let j = 0; j < results.length; j++) {
+                    const item = results[j][i];
+                    if (item && !seenIds.has(item.id.videoId)) {
+                        interleaved.push(item);
+                        seenIds.add(item.id.videoId);
+                    }
+                }
+            }
+
+            setRecommendations(interleaved.slice(0, 40));
+            setApiStatus('success');
+        } catch (err) { handleApiError(err); } 
+        finally { setIsRecommendationsLoading(false); }
+    }, [history, playlists, searchHistory, isAppEntered, currentTrack]);
+
+    useEffect(() => {
+        if (!isAppEntered) return;
+        if (recommendations.length === 0) {
+            fetchPersonalizedRecommendations();
+        }
+    }, [isAppEntered, recommendations.length, fetchPersonalizedRecommendations]);
+
     
     const handleSearch = useCallback(async (query: string) => {
         if (!query.trim()) {
@@ -157,6 +225,14 @@ const App: React.FC = () => {
         setSearchResults([]);
         setError(null);
         setActiveView('home');
+
+        // Save to search history
+        setSearchHistory(prev => {
+            const trimmed = query.trim();
+            const filtered = prev.filter(q => q.toLowerCase() !== trimmed.toLowerCase());
+            return [trimmed, ...filtered].slice(0, 10);
+        });
+
         try {
             const results = await searchVideos(query);
             setSearchResults(results);
@@ -339,7 +415,18 @@ const App: React.FC = () => {
         setTimeout(() => setIsLandingPageMounted(false), 500);
     };
 
+    const navigateToView = useCallback((view: MainView) => {
+        if (view === 'home') {
+            setSearchResults(null);
+            if (activeView === 'home' && searchResults === null) {
+                fetchPersonalizedRecommendations();
+            }
+        }
+        setActiveView(view);
+    }, [activeView, searchResults, fetchPersonalizedRecommendations]);
+
     const renderMainView = () => {
+
         switch(activeView) {
             case 'home':
                 const isShowingSearchResults = searchResults !== null;
@@ -350,7 +437,8 @@ const App: React.FC = () => {
                     onOpenAddToPlaylistModal={handleOpenAddToPlaylistModal}
                     onSelectChannel={handleSelectChannel}
                     viewType={isShowingSearchResults ? 'search' : 'recommendations'}
-                    onGenerateDiscoveryMix={() => {}}
+                    onGenerateDiscoveryMix={fetchPersonalizedRecommendations}
+
                     offlineItems={offlineItems}
                     onAddToOffline={handleAddToOffline}
                     currentTrackId={currentTrack?.id.videoId}
@@ -508,7 +596,8 @@ const App: React.FC = () => {
             </Suspense>
 
             <div className={`grid h-screen font-sans transition-opacity duration-500 ${isAppEntered ? 'opacity-100' : 'opacity-0'} ${currentTrack ? 'grid-rows-[1fr_auto]' : 'grid-rows-1'} grid-cols-1 md:grid-cols-[250px_1fr] bg-dark-bg text-dark-text`}>
-                <Sidebar activeView={activeView} setActiveView={setActiveView} />
+                <Sidebar activeView={activeView} setActiveView={navigateToView} />
+
 
                 <div className="flex flex-col overflow-hidden bg-dark-highlight">
                     <div className="flex-shrink-0 pt-6 pb-4 px-2 md:px-4 flex items-center justify-between">
@@ -606,8 +695,9 @@ const App: React.FC = () => {
                     )}
                 </Suspense>
             </div>
-            <BottomNavBar activeView={activeView} setActiveView={setActiveView} />
+            <BottomNavBar activeView={activeView} setActiveView={navigateToView} />
         </>
+
     );
 };
 

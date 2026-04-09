@@ -1,4 +1,4 @@
-
+// YTS YouTube Service - v1.0.1 (Fix: Deprecated relatedToVideoId)
 import type { VideoItem, YouTubePlaylist } from '../types';
 
 const BASE_URL = 'https://www.googleapis.com/youtube/v3';
@@ -45,7 +45,12 @@ const fetchFromApiCore = async (endpoint: string, params: URLSearchParams): Prom
     params.set('key', apiKey);
 
     try {
+        const paramsObj = Object.fromEntries(params.entries());
+        if (paramsObj.key) paramsObj.key = '***';
+        console.log(`[YouTube API Call]: ${endpoint}`, paramsObj);
+
         const response = await fetch(`${BASE_URL}${endpoint}?${params.toString()}`);
+
 
         if (response.ok) {
             return await response.json();
@@ -102,23 +107,32 @@ export const searchVideos = async (query: string): Promise<VideoItem[]> => {
   return items;
 };
 
-export const getRelatedVideos = async (videoId: string): Promise<VideoItem[]> => {
+export const getRelatedVideos = async (videoId: string, fallbackTitle?: string): Promise<VideoItem[]> => {
     if (typeof videoId !== 'string' || !videoId.trim()) {
         console.warn('getRelatedVideos called with an invalid videoId:', videoId);
         return [];
     }
+    
+    // Note: relatedToVideoId has been deprecated by Google as of Aug 2023.
+    // We now use the video title or video ID as a search query to find related content.
+    const query = fallbackTitle || videoId;
+    
     const params = new URLSearchParams({
         part: 'snippet',
-        relatedToVideoId: videoId,
+        q: query,
         type: 'video',
         maxResults: '25',
     });
+    
+    // If it's a title, we might want to exclude the original video from results manually if possible,
+    // though the search API usually handles relevance well.
     const data = await fetchFromApiCore('/search', params);
     const items = (data.items && Array.isArray(data.items))
-        ? data.items.filter(item => item.id && typeof item.id.videoId === 'string' && item.id.videoId)
+        ? data.items.filter(item => item.id && typeof item.id.videoId === 'string' && item.id.videoId !== videoId)
         : [];
     return items;
 };
+
 
 const getChannelUploadsPlaylistId = async (channelId: string): Promise<string | null> => {
     const params = new URLSearchParams({
