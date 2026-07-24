@@ -1,8 +1,6 @@
 
 import React from 'react';
 import type { VideoItem } from '../types';
-import { DownloadButton } from './DownloadButton';
-import type { TrackDownloadState } from '../hooks/useDownloadManager';
 
 interface SearchResultListProps {
   results: VideoItem[];
@@ -15,9 +13,6 @@ interface SearchResultListProps {
   offlineItems: VideoItem[];
   onAddToOffline: (track: VideoItem) => void;
   currentTrackId?: string | null;
-  getDownloadState: (videoId: string) => TrackDownloadState;
-  onDownloadTrack: (track: VideoItem) => void;
-  onDeleteDownload: (videoId: string) => void;
 }
 
 const SearchResultItem: React.FC<{
@@ -25,34 +20,42 @@ const SearchResultItem: React.FC<{
     onSelectTrack: (track: VideoItem, contextList?: VideoItem[]) => void;
     onOpenAddToPlaylistModal: (track: VideoItem) => void;
     onSelectChannel: (channelId: string, channelTitle: string) => void;
+    isOffline: boolean;
+    onAddToOffline: (track: VideoItem) => void;
     isPlaying: boolean;
     contextList: VideoItem[];
-    downloadState: TrackDownloadState;
-    onDownload: () => void;
-    onDeleteDownload: () => void;
-}> = ({ item, onSelectTrack, onOpenAddToPlaylistModal, onSelectChannel, isPlaying, contextList, downloadState, onDownload, onDeleteDownload }) => (
-    <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
+}> = ({ item, onSelectTrack, onOpenAddToPlaylistModal, onSelectChannel, isOffline, onAddToOffline, isPlaying, contextList }) => (
+    <div className={`grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group ${isPlaying ? 'bg-dark-highlight/50' : ''}`}>
         <div className="relative w-12 h-12">
             <img
                 src={item.snippet.thumbnails.default.url}
                 alt={item.snippet.title}
                 className="w-full h-full rounded-md object-cover"
             />
-             <button
-                onClick={() => onSelectTrack(item, contextList)}
-                className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-md"
-                aria-label={`Putar ${item.snippet.title}`}
-            >
-                <i className="fas fa-play text-white text-lg"></i>
-            </button>
+            {isPlaying ? (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-md">
+                    <span className="relative flex h-4 w-4">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500"></span>
+                    </span>
+                </div>
+            ) : (
+                <button
+                    onClick={() => onSelectTrack(item, contextList)}
+                    className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-md"
+                    aria-label={`Putar ${item.snippet.title}`}
+                >
+                    <i className="fas fa-play text-white text-lg"></i>
+                </button>
+            )}
         </div>
         <div className="min-w-0">
-            <p
+            <p 
                 onClick={() => onSelectTrack(item, contextList)}
                 className={`text-sm font-semibold cursor-pointer ${isPlaying ? 'text-brand-red' : 'text-white'} [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden`}>
                 {item.snippet.title}
             </p>
-            <p
+            <p 
                 className="text-xs text-dark-subtext cursor-pointer hover:underline"
                 onClick={() => onSelectChannel(item.snippet.channelId, item.snippet.channelTitle)}
             >
@@ -60,14 +63,19 @@ const SearchResultItem: React.FC<{
             </p>
         </div>
         <div className="flex items-center space-x-1 flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-            <DownloadButton
-                state={downloadState}
-                onDownload={onDownload}
-                onDelete={onDeleteDownload}
-            />
+            <button
+                onClick={() => onAddToOffline(item)}
+                disabled={isOffline}
+                className={`p-2 w-10 rounded-full transition-colors duration-200 ${
+                    isOffline ? 'text-green-500' : 'text-dark-subtext hover:text-white'
+                }`}
+                title={isOffline ? "Disimpan offline" : "Simpan untuk offline"}
+            >
+                <i className={`fas ${isOffline ? 'fa-check-circle' : 'fa-cloud-download-alt'}`}></i>
+            </button>
             <button
                 onClick={() => onOpenAddToPlaylistModal(item)}
-                className="p-2 w-8 h-8 flex items-center justify-center rounded-full text-dark-subtext hover:text-white transition-colors duration-200"
+                className="p-2 w-10 rounded-full text-dark-subtext hover:text-white transition-colors duration-200"
                 title="Tambahkan ke playlist"
             >
                 <i className="fas fa-plus"></i>
@@ -77,11 +85,7 @@ const SearchResultItem: React.FC<{
 );
 
 
-export const SearchResultList: React.FC<SearchResultListProps> = ({
-  results, isLoading, onSelectTrack, onOpenAddToPlaylistModal, onSelectChannel,
-  viewType, onGenerateDiscoveryMix, offlineItems, onAddToOffline, currentTrackId,
-  getDownloadState, onDownloadTrack, onDeleteDownload
-}) => {
+export const SearchResultList: React.FC<SearchResultListProps> = ({ results, isLoading, onSelectTrack, onOpenAddToPlaylistModal, onSelectChannel, viewType, onGenerateDiscoveryMix, offlineItems, onAddToOffline, currentTrackId }) => {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -92,7 +96,7 @@ export const SearchResultList: React.FC<SearchResultListProps> = ({
 
   const discoveryMixButton = (
     <div className="mb-6">
-        <button
+        <button 
             onClick={onGenerateDiscoveryMix}
             disabled={isLoading}
             className="px-6 py-3 bg-brand-red text-white font-semibold rounded-full hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-brand-red/50 transition-all duration-200 ease-in-out shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-lg"
@@ -102,7 +106,7 @@ export const SearchResultList: React.FC<SearchResultListProps> = ({
         </button>
     </div>
   );
-
+  
   if (results.length === 0 && !isLoading) {
     return (
         <div className="text-center py-10 text-dark-subtext">
@@ -128,11 +132,10 @@ export const SearchResultList: React.FC<SearchResultListProps> = ({
                 onSelectTrack={onSelectTrack}
                 onOpenAddToPlaylistModal={onOpenAddToPlaylistModal}
                 onSelectChannel={onSelectChannel}
+                isOffline={offlineItems.some(o => o.id.videoId === item.id.videoId)}
+                onAddToOffline={onAddToOffline}
                 isPlaying={currentTrackId === item.id.videoId}
                 contextList={results}
-                downloadState={getDownloadState(item.id.videoId)}
-                onDownload={() => onDownloadTrack(item)}
-                onDeleteDownload={() => onDeleteDownload(item.id.videoId)}
             />
         )
       )}

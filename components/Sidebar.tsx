@@ -1,7 +1,7 @@
 
 import React from 'react';
 
-type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'channel' | 'video';
+type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'offline' | 'channel' | 'video';
 
 interface SidebarProps {
   activeView: MainView;
@@ -42,7 +42,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) =
                     isActive={activeView === 'home'} 
                     onClick={() => setActiveView('home')} 
                 />
-
                 <NavLink 
                     icon="fa-list-ul" 
                     label="Playlist" 
@@ -55,7 +54,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) =
                     isActive={activeView === 'history'} 
                     onClick={() => setActiveView('history')} 
                 />
-                </nav>
+                 <NavLink 
+                    icon="fa-cloud-download-alt" 
+                    label="Koleksi Offline" 
+                    isActive={activeView === 'offline'} 
+                    onClick={() => setActiveView('offline')} 
+                />
+            </nav>
         </aside>
     );
 };

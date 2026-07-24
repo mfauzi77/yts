@@ -3,12 +3,12 @@
   "name": "YTS - YouTube Streamer",
   "icons": [
     {
-      "src": "/icons/icon-192x192.png",
+      "src": "https://picsum.photos/192/192",
       "type": "image/png",
       "sizes": "192x192"
     },
     {
-      "src": "/icons/icon-512x512.png",
+      "src": "https://picsum.photos/512/512",
       "type": "image/png",
       "sizes": "512x512"
     }

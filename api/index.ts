@@ -1,7 +1,6 @@
 import express from "express";
 import cors from "cors";
 import path from "path";
-import ytdl from "@distube/ytdl-core";
 
 const app = express();
 
@@ -95,48 +94,6 @@ app.use("/api/youtube", async (req, res) => {
   } catch (error) {
     console.error("Unhandled error in /api/youtube:", error);
     res.status(500).json({ error: { message: "Internal Server Error" } });
-  }
-});
-
-// Audio Stream Endpoint — proxy YouTube audio to bypass CORS
-app.get("/api/audio/:videoId", async (req, res) => {
-  const { videoId } = req.params;
-  if (!videoId || !ytdl.validateID(videoId)) {
-    return res.status(400).json({ error: { message: "Video ID tidak valid." } });
-  }
-
-  try {
-    const url = `https://www.youtube.com/watch?v=${videoId}`;
-    const info = await ytdl.getInfo(url);
-
-    // Pilih format audio-only terbaik
-    const format = ytdl.chooseFormat(info.formats, {
-      quality: "highestaudio",
-      filter: "audioonly",
-    });
-
-    if (!format) {
-      return res.status(404).json({ error: { message: "Tidak ada format audio yang tersedia untuk video ini." } });
-    }
-
-    const title = info.videoDetails.title.replace(/[^\w\s-]/g, "").trim();
-    const contentLength = format.contentLength ? parseInt(format.contentLength) : undefined;
-
-    res.setHeader("Content-Type", format.mimeType?.split(";")[0] || "audio/webm");
-    res.setHeader("Content-Disposition", `attachment; filename="${title}.webm"`);
-    if (contentLength) {
-      res.setHeader("Content-Length", contentLength.toString());
-    }
-    res.setHeader("Accept-Ranges", "bytes");
-    res.setHeader("Cache-Control", "no-store");
-
-    // Stream audio langsung ke client
-    ytdl(url, { format }).pipe(res);
-  } catch (error: any) {
-    console.error(`[audio endpoint] Error for ${videoId}:`, error?.message || error);
-    if (!res.headersSent) {
-      res.status(500).json({ error: { message: "Gagal mengambil audio dari YouTube." } });
-    }
   }
 });
 
