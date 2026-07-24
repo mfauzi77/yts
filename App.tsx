@@ -1,5 +1,4 @@
-
-import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
+import React, { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import { SearchBar } from './components/SearchBar';
 import { getChannelVideos, getRelatedVideos, searchVideos, getChannelPlaylists, getPlaylistItems } from './services/youtubeService';
 import { useLocalStorage } from './hooks/useLocalStorage';
@@ -56,7 +55,7 @@ const App: React.FC = () => {
     
     const [selectedYouTubePlaylist, setSelectedYouTubePlaylist] = useState<YouTubePlaylist | null>(null);
     const [youtubePlaylistVideos, setYoutubePlaylistVideos] = useState<VideoItem[]>([]);
-    const [isYoutubePlaylistLoading, setIsYoutubePlaylistLoading] = useState<boolean>(false);
+    const [_isYoutubePlaylistLoading, setIsYoutubePlaylistLoading] = useState<boolean>(false);
 
     const [apiStatus, setApiStatus] = useState<ApiStatus>('idle');
     const [isAppEntered, setIsAppEntered] = useState<boolean>(true);
@@ -67,7 +66,7 @@ const App: React.FC = () => {
     const [playlists, setPlaylists] = useLocalStorage<Playlist[]>('ytas-playlists', []);
     const [history, setHistory] = useLocalStorage<VideoItem[]>('ytas-history', []);
     const [offlineItems, setOfflineItems] = useLocalStorage<VideoItem[]>('ytas-offline', []);
-    const [syncedOfflineIds, setSyncedOfflineIds] = useLocalStorage<string[]>('ytas-synced-ids', []);
+    const [_syncedOfflineIds, setSyncedOfflineIds] = useLocalStorage<string[]>('ytas-synced-ids', []);
     const [isAutoplayEnabled, setIsAutoplayEnabled] = useLocalStorage<boolean>('ytas-autoplay', true);
     const [isShuffle, setIsShuffle] = useLocalStorage<boolean>('ytas-shuffle', false);
     const [likedSongs, setLikedSongs] = useLocalStorage<string[]>('ytas-liked-songs', []);
@@ -83,7 +82,7 @@ const App: React.FC = () => {
     
 
     // --- Download Manager ---
-    const { downloadTrack, deleteOfflineTrack, getDownloadState, savedIds, refreshSavedIds } = useDownloadManager();
+    const { downloadTrack, deleteOfflineTrack, getDownloadState, refreshSavedIds } = useDownloadManager();
 
     // --- Shared Playlist via URL ---
     useEffect(() => {
@@ -182,7 +181,7 @@ const App: React.FC = () => {
                     }
 
                     return [];
-                } catch (e) { return []; }
+                } catch { return []; }
             }));
 
             // Merge & Interleave
@@ -242,7 +241,7 @@ const App: React.FC = () => {
         } finally {
             setIsSearchLoading(false);
         }
-    }, []);
+    }, [setSearchHistory]);
 
     const addToHistory = useCallback((track: VideoItem) => {
         setHistory(prevHistory => {
@@ -311,7 +310,7 @@ const App: React.FC = () => {
             CUED: 5
         };
 
-        console.log(`[Player State Change]: ${Object.keys(PlayerState).find(key => (PlayerState as any)[key] === event.data)} (${event.data})`);
+        console.log(`[Player State Change]: ${Object.keys(PlayerState).find(key => (PlayerState as Record<string, number>)[key] === event.data)} (${event.data})`);
 
         if (event.data === PlayerState.PLAYING) {
             setIsPlaying(true);
@@ -324,25 +323,20 @@ const App: React.FC = () => {
                 setIsPlaying(false);
             }
         } else if (event.data === PlayerState.PAUSED) {
-            // Only set isPlaying to false if the connection is likely stable
-            // but the player stopped (usually manual or device-level pause)
-            // On mobile, lock screen 'pause' will trigger this.
-            // We'll keep the state updated so UI reflects Reality.
             setIsPlaying(false);
         } else if (event.data === PlayerState.BUFFERING) {
-            // Keep isPlaying as true during buffering so it auto-resumes
             setIsPlaying(true);
         }
     }, [playNext, isAutoplayEnabled]);
 
-    // --- Offline / Local Playback --- (declared first so useYouTubePlayer can reference isLocalMode)
+    // --- Offline / Local Playback ---
     const offlinePlayerData = useOfflinePlayer({
         videoId: currentTrack?.id.videoId ?? null,
         isPlaying,
         onEnded: playNext,
     });
 
-    const { volume, setVolume, seekTo, currentTime, duration } = useYouTubePlayer({
+    const { volume, setVolume, seekTo, currentTime, duration, play, pause } = useYouTubePlayer({
         videoId: currentTrack?.id.videoId ?? null,
         isPlaying: isPlaying && !offlinePlayerData.isLocalMode,
         onStateChange: handlePlayerStateChange,
@@ -354,6 +348,101 @@ const App: React.FC = () => {
     const activeSeekTo      = offlinePlayerData.isLocalMode ? offlinePlayerData.localSeekTo      : seekTo;
     const activeVolume      = offlinePlayerData.isLocalMode ? offlinePlayerData.localVolume      : volume;
     const activeSetVolume   = offlinePlayerData.isLocalMode ? offlinePlayerData.localSetVolume   : setVolume;
+
+    // Media Session API for mobile browser, Android mini-browser & notification controls
+    useEffect(() => {
+        if ('mediaSession' in navigator && currentTrack) {
+            try {
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: currentTrack.snippet.title,
+                    artist: currentTrack.snippet.channelTitle,
+                    album: 'YTS Music',
+                    artwork: [
+                        { src: currentTrack.snippet.thumbnails.default.url, sizes: '120x90', type: 'image/jpeg' },
+                        { src: currentTrack.snippet.thumbnails.medium?.url || currentTrack.snippet.thumbnails.default.url, sizes: '320x180', type: 'image/jpeg' },
+                        { src: currentTrack.snippet.thumbnails.high?.url || currentTrack.snippet.thumbnails.default.url, sizes: '480x360', type: 'image/jpeg' },
+                    ]
+                });
+            } catch (e) {
+                console.warn('Failed to set MediaMetadata:', e);
+            }
+
+            // Sync playbackState synchronously for OS/browser media notification UI
+            navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+
+            // Safe action handler assignment helper
+            const setHandler = (action: MediaSessionAction, handler: MediaSessionActionHandler | null) => {
+                try {
+                    navigator.mediaSession.setActionHandler(action, handler);
+                } catch {
+                    // Handler not supported on current browser version
+                }
+            };
+
+            setHandler('play', () => {
+                try {
+                    navigator.mediaSession.playbackState = 'playing';
+                    setIsPlaying(true);
+                    play();
+                } catch (e) {
+                    console.error('MediaSession play error:', e);
+                }
+            });
+
+            setHandler('pause', () => {
+                try {
+                    navigator.mediaSession.playbackState = 'paused';
+                    setIsPlaying(false);
+                    pause();
+                } catch (e) {
+                    console.error('MediaSession pause error:', e);
+                }
+            });
+
+            setHandler('stop', () => {
+                try {
+                    navigator.mediaSession.playbackState = 'none';
+                    setIsPlaying(false);
+                    pause();
+                } catch (e) {
+                    console.error('MediaSession stop error:', e);
+                }
+            });
+
+            setHandler('previoustrack', () => playPrev());
+            setHandler('nexttrack', () => playNext());
+
+            setHandler('seekto', (details) => {
+                if (details.seekTime !== undefined && !isNaN(details.seekTime)) {
+                    activeSeekTo(details.seekTime);
+                }
+            });
+
+            setHandler('seekbackward', (details) => {
+                const offset = details.seekOffset || 10;
+                activeSeekTo(Math.max((activeCurrentTime || 0) - offset, 0));
+            });
+
+            setHandler('seekforward', (details) => {
+                const offset = details.seekOffset || 10;
+                activeSeekTo(Math.min((activeCurrentTime || 0) + offset, activeDuration || 0));
+            });
+
+            // Update position state safely
+            if ('setPositionState' in navigator.mediaSession && activeDuration > 0 && !isNaN(activeDuration) && !isNaN(activeCurrentTime)) {
+                try {
+                    const validPosition = Math.min(Math.max(activeCurrentTime, 0), activeDuration);
+                    navigator.mediaSession.setPositionState({
+                        duration: activeDuration,
+                        playbackRate: 1,
+                        position: validPosition
+                    });
+                } catch {
+                    // Ignore position state errors
+                }
+            }
+        }
+    }, [currentTrack, isPlaying, playNext, playPrev, activeCurrentTime, activeDuration, activeSeekTo, play, pause]);
 
     const handleOpenAddToPlaylistModal = (track: VideoItem) => setModalTrack(track);
     const handleCloseAddToPlaylistModal = () => setModalTrack(null);

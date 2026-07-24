@@ -1,5 +1,8 @@
 {
   "name": "YTS",
   "description": "A minimalist, modern, and legal YouTube streamer. Search for songs, create playlists, and listen directly from YouTube. Features a sleek interface, playback history, and a visualizer.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

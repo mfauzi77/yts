@@ -1,9 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { DownloadButton } from './DownloadButton';
-import type { TrackDownloadState } from '../hooks/useDownloadManager';
 import type { VideoItem, Playlist } from '../types';
-import { encodePlaylistToUrl } from '../services/sharePlaylist';
 
 interface PlaylistDetailViewProps {
   playlist: Playlist;
@@ -13,17 +10,12 @@ interface PlaylistDetailViewProps {
   currentTrackId?: string | null;
   isAutoplayEnabled: boolean;
   onToggleAutoplay: () => void;
-  isShuffle: boolean;
-  onToggleShuffle: () => void;
   offlineItems: VideoItem[];
   onAddToOffline: (track: VideoItem) => void;
   onBack: () => void;
   onDelete: () => void;
   onRename: (newName: string) => void;
   isYouTubePlaylist?: boolean;
-  getDownloadState: (videoId: string) => TrackDownloadState;
-  onDownloadTrack: (track: VideoItem) => void;
-  onDeleteDownload: (videoId: string) => void;
 }
 
 const PlaylistItem: React.FC<{
@@ -33,18 +25,28 @@ const PlaylistItem: React.FC<{
     onRemoveFromPlaylist: (trackId: string) => void;
     onSelectChannel: (channelId: string, channelTitle: string) => void;
     isPlaying: boolean;
+    isOffline: boolean;
+    onAddToOffline: (track: VideoItem) => void;
     playlistTracks: VideoItem[];
     isYouTubePlaylist?: boolean;
-    downloadState: TrackDownloadState;
-    onDownload: () => void;
-    onDeleteDownload: () => void;
-}> = ({ item, index, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, isPlaying, playlistTracks, isYouTubePlaylist, downloadState, onDownload, onDeleteDownload }) => (
-    <div className="grid grid-cols-[20px_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
+}> = ({ item, index, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, isPlaying, isOffline, onAddToOffline, playlistTracks, isYouTubePlaylist }) => (
+    <div className={`grid grid-cols-[20px_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group ${isPlaying ? 'bg-dark-highlight/50' : ''}`}>
         <div className="flex items-center justify-center text-dark-subtext">
-            <span className="group-hover:hidden">{index + 1}</span>
-            <button onClick={() => onSelectTrack(item, playlistTracks)} className="hidden group-hover:block" aria-label={`Putar ${item.snippet.title}`}>
-                <i className="fas fa-play text-white"></i>
-            </button>
+            {isPlaying ? (
+                <div className="flex items-center justify-center">
+                    <span className="relative flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                    </span>
+                </div>
+            ) : (
+                <>
+                    <span className="group-hover:hidden">{index + 1}</span>
+                    <button onClick={() => onSelectTrack(item, playlistTracks)} className="hidden group-hover:block" aria-label={`Putar ${item.snippet.title}`}>
+                        <i className="fas fa-play text-white"></i>
+                    </button>
+                </>
+            )}
         </div>
         <div className="flex items-center gap-4">
              <img
@@ -65,11 +67,16 @@ const PlaylistItem: React.FC<{
             </div>
         </div>
         <div className="flex items-center space-x-1 flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-            <DownloadButton
-                state={downloadState}
-                onDownload={onDownload}
-                onDelete={onDeleteDownload}
-            />
+             <button
+                onClick={() => onAddToOffline(item)}
+                disabled={isOffline}
+                className={`p-2 w-10 rounded-full transition-colors duration-200 ${
+                    isOffline ? 'text-green-500' : 'text-dark-subtext hover:text-white'
+                }`}
+                title={isOffline ? "Disimpan offline" : "Simpan untuk offline"}
+            >
+                <i className={`fas ${isOffline ? 'fa-check-circle' : 'fa-cloud-download-alt'}`}></i>
+            </button>
             {!isYouTubePlaylist && (
                 <button onClick={() => onRemoveFromPlaylist(item.id.videoId)} className="p-2 w-10 rounded-full text-dark-subtext hover:text-white" title="Hapus dari playlist">
                     <i className="fas fa-trash-alt"></i>
@@ -88,7 +95,6 @@ const PlaylistHeader: React.FC<{
 }> = ({ playlist, onBack, onDelete, onRename, isYouTubePlaylist }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [title, setTitle] = useState(playlist.name);
-    const [shareToast, setShareToast] = useState<'idle' | 'copied' | 'error'>('idle');
     const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -118,25 +124,11 @@ const PlaylistHeader: React.FC<{
             setIsEditing(false);
         }
     };
-
-    const handleShare = async () => {
-        if (playlist.tracks.length === 0) return;
-        const url = encodePlaylistToUrl(playlist);
-        try {
-            await navigator.clipboard.writeText(url);
-            setShareToast('copied');
-        } catch {
-            // Fallback: buka prompt agar user bisa copy manual
-            prompt('Salin link share di bawah ini:', url);
-            setShareToast('copied');
-        }
-        setTimeout(() => setShareToast('idle'), 2500);
-    };
     
     return (
         <div className="flex-shrink-0 pt-6 pb-4 px-2 md:px-0 flex items-center justify-between">
-            <div className="flex items-center gap-2 min-w-0">
-                <button onClick={onBack} className="p-2 mr-2 -ml-2 rounded-full hover:bg-dark-surface flex-shrink-0">
+            <div className="flex items-center gap-2">
+                <button onClick={onBack} className="p-2 mr-2 -ml-2 rounded-full hover:bg-dark-surface">
                     <i className="fas fa-arrow-left text-white"></i>
                 </button>
                 {isEditing && !isYouTubePlaylist ? (
@@ -147,7 +139,7 @@ const PlaylistHeader: React.FC<{
                         onChange={e => setTitle(e.target.value)}
                         onBlur={handleRename}
                         onKeyDown={handleKeyDown}
-                        className="text-3xl md:text-4xl font-bold text-white bg-transparent border-b-2 border-brand-red outline-none min-w-0"
+                        className="text-3xl md:text-4xl font-bold text-white bg-transparent border-b-2 border-brand-red outline-none"
                     />
                 ) : (
                     <h1 
@@ -158,36 +150,17 @@ const PlaylistHeader: React.FC<{
                     </h1>
                 )}
             </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-                {/* Share button — hanya untuk playlist lokal yg ada isinya */}
-                {!isYouTubePlaylist && playlist.tracks.length > 0 && (
-                    <div className="relative">
-                        <button
-                            onClick={handleShare}
-                            className="p-2 rounded-full text-dark-subtext hover:text-white hover:bg-dark-surface transition-colors"
-                            title="Bagikan playlist"
-                        >
-                            <i className={`fas ${shareToast === 'copied' ? 'fa-check text-green-400' : 'fa-share-alt'}`}></i>
-                        </button>
-                        {shareToast === 'copied' && (
-                            <div className="absolute right-0 top-full mt-1 z-50 whitespace-nowrap bg-dark-card border border-white/10 text-green-400 text-xs font-semibold px-3 py-1.5 rounded-lg shadow-lg pointer-events-none">
-                                Link disalin!
-                            </div>
-                        )}
-                    </div>
-                )}
-                {!isYouTubePlaylist && (
-                    <button onClick={onDelete} className="p-2 rounded-full text-dark-subtext hover:text-brand-red hover:bg-dark-surface transition-colors" title="Hapus playlist">
-                        <i className="fas fa-trash-alt"></i>
-                    </button>
-                )}
-            </div>
+            {!isYouTubePlaylist && (
+                <button onClick={onDelete} className="p-2 rounded-full text-dark-subtext hover:text-brand-red hover:bg-dark-surface" title="Hapus playlist">
+                    <i className="fas fa-trash-alt"></i>
+                </button>
+            )}
         </div>
     );
 };
 
 
-export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, currentTrackId, isAutoplayEnabled, onToggleAutoplay, isShuffle, onToggleShuffle, offlineItems, onAddToOffline, onBack, onDelete, onRename, isYouTubePlaylist, getDownloadState, onDownloadTrack, onDeleteDownload }) => {
+export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, currentTrackId, isAutoplayEnabled, onToggleAutoplay, offlineItems, onAddToOffline, onBack, onDelete, onRename, isYouTubePlaylist }) => {
   if (!playlist) return null;
 
   if (playlist.tracks.length === 0) {
@@ -206,14 +179,18 @@ export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist
   return (
     <div>
         <PlaylistHeader playlist={playlist} onBack={onBack} onDelete={onDelete} onRename={onRename} isYouTubePlaylist={isYouTubePlaylist} />
-        <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-3 mb-6 pr-2">
-
-            <div className="flex items-center">
-                <span className="mr-3 text-sm font-medium text-dark-subtext">Acak</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" checked={isShuffle} onChange={onToggleShuffle} className="sr-only peer" />
-                    <div className="w-11 h-6 bg-dark-card peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-brand-red"></div>
-                </label>
+        <div className="flex items-center justify-between mb-4 pr-2">
+            <div className="flex items-center space-x-2">
+                <button 
+                    onClick={() => {
+                        const shuffled = [...playlist.tracks].sort(() => Math.random() - 0.5);
+                        onSelectTrack(shuffled[0], shuffled);
+                    }}
+                    className="flex items-center space-x-2 px-4 py-2 bg-brand-red hover:bg-red-700 text-white rounded-full text-sm font-bold transition-all transform active:scale-95 shadow-lg"
+                >
+                    <i className="fas fa-random"></i>
+                    <span>Acak & Putar</span>
+                </button>
             </div>
             <div className="flex items-center">
                 <span className="mr-3 text-sm font-medium text-dark-subtext">Putar Otomatis</span>
@@ -223,9 +200,10 @@ export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist
                 </label>
             </div>
         </div>
-
         <div className="space-y-1">
-          {playlist.tracks.map((item, index) => (
+          {playlist.tracks.map((item, index) => {
+            const isOffline = offlineItems.some(o => o.id.videoId === item.id.videoId);
+            return (
                 <PlaylistItem 
                     key={item.id.videoId} 
                     item={item}
@@ -234,14 +212,13 @@ export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist
                     onRemoveFromPlaylist={onRemoveFromPlaylist}
                     onSelectChannel={onSelectChannel}
                     isPlaying={currentTrackId === item.id.videoId}
+                    isOffline={isOffline}
+                    onAddToOffline={onAddToOffline}
                     playlistTracks={playlist.tracks}
                     isYouTubePlaylist={isYouTubePlaylist}
-                    downloadState={getDownloadState(item.id.videoId)}
-                    onDownload={() => onDownloadTrack(item)}
-                    onDeleteDownload={() => onDeleteDownload(item.id.videoId)}
                 />
-                ))
-          }
+            )
+          })}
         </div>
     </div>
   );

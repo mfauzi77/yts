@@ -1,4 +1,3 @@
-
 import type { Playlist, VideoItem } from '../types';
 
 const BASE_URL = 'https://yts-lovat.vercel.app';

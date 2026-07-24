@@ -1,4 +1,3 @@
-
 const STATIC_CACHE_NAME = 'yts-static-cache-v2';
 const DATA_CACHE_NAME = 'yts-data-cache-v2';
 const IMAGE_CACHE_NAME = 'yts-image-cache-v1';

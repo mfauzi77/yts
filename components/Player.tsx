@@ -1,7 +1,5 @@
 import React, { useEffect } from 'react';
 import type { VideoItem } from '../types';
-import { DownloadButton } from './DownloadButton';
-import type { TrackDownloadState } from '../hooks/useDownloadManager';
 
 interface PlayerProps {
   track: VideoItem;
@@ -18,12 +16,6 @@ interface PlayerProps {
   seekTo: (seconds: number) => void;
   isAutoplayEnabled: boolean;
   onToggleAutoplay: () => void;
-  isShuffle: boolean;
-  onToggleShuffle: () => void;
-  isLocalMode?: boolean;
-  downloadState: TrackDownloadState;
-  onDownload: () => void;
-  onDeleteDownload: () => void;
 }
 
 const formatTime = (seconds: number) => {
@@ -33,71 +25,23 @@ const formatTime = (seconds: number) => {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 };
 
-const vibrate = (duration: number = 20) => {
-    if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate(duration);
-    }
-};
-
 
 export const Player: React.FC<PlayerProps> = ({
     track, isPlaying, setIsPlaying, onNext, onPrev, onToggleNowPlaying,
     onSelectChannel, volume, setVolume, currentTime, duration, seekTo,
-    isAutoplayEnabled, onToggleAutoplay, isShuffle, onToggleShuffle,
-    isLocalMode = false, downloadState, onDownload, onDeleteDownload,
+    isAutoplayEnabled, onToggleAutoplay
 }) => {
     
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-            if (e.code === 'Space') { 
-                e.preventDefault(); 
-                setIsPlaying(!isPlaying); 
-                vibrate(15);
-            }
-            if (e.code === 'ArrowRight') { e.preventDefault(); onNext(); vibrate(15); }
-            if (e.code === 'ArrowLeft') { e.preventDefault(); onPrev(); vibrate(15); }
+            if (e.code === 'Space') { e.preventDefault(); setIsPlaying(!isPlaying); }
+            if (e.code === 'ArrowRight') { e.preventDefault(); onNext(); }
+            if (e.code === 'ArrowLeft') { e.preventDefault(); onPrev(); }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [onNext, onPrev, isPlaying, setIsPlaying]);
-
-    // Media Session API for mobile lock screen controls
-    useEffect(() => {
-        if ('mediaSession' in navigator) {
-            const metadata = {
-                title: track.snippet.title,
-                artist: track.snippet.channelTitle,
-                album: 'YouTube Music Search',
-                artwork: [
-                    { src: track.snippet.thumbnails.default.url, sizes: '96x96', type: 'image/jpeg' },
-                    { src: track.snippet.thumbnails.medium?.url || track.snippet.thumbnails.default.url, sizes: '192x192', type: 'image/jpeg' },
-                    { src: track.snippet.thumbnails.high?.url || track.snippet.thumbnails.default.url, sizes: '512x512', type: 'image/jpeg' },
-                ]
-            };
-            
-            navigator.mediaSession.metadata = new MediaMetadata(metadata);
-            
-            navigator.mediaSession.setActionHandler('play', () => { setIsPlaying(true); });
-            navigator.mediaSession.setActionHandler('pause', () => { setIsPlaying(false); });
-            navigator.mediaSession.setActionHandler('previoustrack', () => { onPrev(); vibrate(15); });
-            navigator.mediaSession.setActionHandler('nexttrack', () => { onNext(); vibrate(15); });
-            
-            // Cleanup handlers on unmount
-            return () => {
-                navigator.mediaSession.setActionHandler('play', null);
-                navigator.mediaSession.setActionHandler('pause', null);
-                navigator.mediaSession.setActionHandler('previoustrack', null);
-                navigator.mediaSession.setActionHandler('nexttrack', null);
-            };
-        }
-    }, [track, onNext, onPrev, setIsPlaying]);
-
-    useEffect(() => {
-        if ('mediaSession' in navigator) {
-            navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
-        }
-    }, [isPlaying]);
 
     const handleChannelClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -131,21 +75,7 @@ export const Player: React.FC<PlayerProps> = ({
                     </div>
                 </div>
                 <div className="flex items-center space-x-2 flex-shrink-0 pl-2">
-                    {/* Offline badge for mobile */}
-                    {isLocalMode && (
-                        <span className="text-[9px] font-bold text-green-400 bg-green-900/40 border border-green-500/30 px-1.5 py-0.5 rounded">
-                            <i className="fas fa-wifi-slash mr-1" />OFFLINE
-                        </span>
-                    )}
-                    <DownloadButton
-                        state={downloadState}
-                        onDownload={onDownload}
-                        onDelete={onDeleteDownload}
-                    />
-                    <button 
-                        onClick={() => { setIsPlaying(!isPlaying); vibrate(20); }} 
-                        className="w-10 h-10 flex items-center justify-center text-white"
-                    >
+                    <button onClick={() => setIsPlaying(!isPlaying)} className="w-10 h-10 flex items-center justify-center text-white">
                         <i className={`fas ${isPlaying ? 'fa-pause' : 'fa-play'} text-2xl`}></i>
                     </button>
                 </div>
@@ -172,13 +102,13 @@ export const Player: React.FC<PlayerProps> = ({
                 {/* Center: Playback Controls */}
                 <div className="flex flex-col items-center justify-center">
                     <div className="flex items-center space-x-6">
-                        <button onClick={() => { onPrev(); vibrate(15); }} className="text-dark-subtext hover:text-white transition-colors">
+                        <button onClick={onPrev} className="text-dark-subtext hover:text-white transition-colors">
                             <i className="fas fa-step-backward fa-lg"></i>
                         </button>
-                        <button onClick={() => { setIsPlaying(!isPlaying); vibrate(25); }} className="w-10 h-10 flex items-center justify-center bg-white text-black rounded-full shadow-md hover:scale-105 transition-transform">
+                        <button onClick={() => setIsPlaying(!isPlaying)} className="w-10 h-10 flex items-center justify-center bg-white text-black rounded-full shadow-md hover:scale-105 transition-transform">
                             <i className={`fas ${isPlaying ? 'fa-pause' : 'fa-play'} fa-lg`}></i>
                         </button>
-                        <button onClick={() => { onNext(); vibrate(15); }} className="text-dark-subtext hover:text-white transition-colors">
+                        <button onClick={onNext} className="text-dark-subtext hover:text-white transition-colors">
                             <i className="fas fa-step-forward fa-lg"></i>
                         </button>
                     </div>
@@ -198,36 +128,16 @@ export const Player: React.FC<PlayerProps> = ({
 
                 {/* Right: Volume & Options */}
                 <div className="flex items-center space-x-4 justify-end">
-                    {isLocalMode ? (
-                        <div className="hidden lg:flex items-center gap-1.5 px-2 py-1 bg-green-900/30 border border-green-500/30 rounded text-[10px] text-green-400 font-bold">
-                            <i className="fas fa-wifi-slash" />
-                            OFFLINE
-                        </div>
-                    ) : (
-                        <div className="hidden lg:flex items-center gap-1.5 px-2 py-1 bg-green-900/30 border border-green-500/30 rounded text-[10px] text-green-400 font-bold">
-                            <i className="fas fa-leaf" />
-                            DATA SAVER
-                        </div>
-                    )}
-                    <DownloadButton
-                        state={downloadState}
-                        onDownload={onDownload}
-                        onDelete={onDeleteDownload}
-                        size="md"
-                    />
+                    <div className="hidden lg:flex items-center gap-1.5 px-2 py-1 bg-green-900/30 border border-green-500/30 rounded text-[10px] text-green-400 font-bold">
+                        <i className="fas fa-leaf"></i>
+                        DATA SAVER
+                    </div>
                     <button
-                        onClick={() => { onToggleAutoplay(); vibrate(15); }}
-                        title={isAutoplayEnabled ? "Matikan Putar Otomatis" : "Aktifkan Putar Otomatis"}
-                        className={`p-2 rounded-full transition-colors ${isAutoplayEnabled ? 'text-brand-red' : 'text-dark-subtext hover:bg-dark-card hover:text-white'}`}
+                        onClick={onToggleAutoplay}
+                        title="Alihkan Putar Otomatis"
+                        className={`p-2 rounded-full text-dark-subtext hover:bg-dark-card hover:text-white transition-colors ${isAutoplayEnabled ? 'text-brand-red' : ''}`}
                     >
-                        <i className={`fas ${isAutoplayEnabled ? 'fa-redo-alt' : 'fa-redo'}`}></i>
-                    </button>
-                    <button
-                        onClick={() => { onToggleShuffle(); vibrate(15); }}
-                        title={isShuffle ? "Matikan Acak" : "Aktifkan Acak"}
-                        className={`p-2 rounded-full transition-colors ${isShuffle ? 'text-brand-red' : 'text-dark-subtext hover:bg-dark-card hover:text-white'}`}
-                    >
-                        <i className="fas fa-random"></i>
+                        <i className="fas fa-redo-alt"></i>
                     </button>
                     <div className="flex items-center space-x-2 w-32">
                         <i className={`fas ${volume === 0 ? 'fa-volume-mute' : 'fa-volume-down'} text-dark-subtext`}></i>
