@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 interface YouTubePlayer {
-  loadVideoById: (videoId: string | { videoId: string; suggestedQuality?: string }) => void;
+  loadVideoById: (videoId: string) => void;
   playVideo: () => void;
   pauseVideo: () => void;
   getPlayerState: () => number;
@@ -18,12 +18,11 @@ interface UseYouTubePlayerProps {
     videoId: string | null;
     isPlaying: boolean;
     onStateChange?: (event: { data: number }) => void;
-    onError?: (event: { data: number }) => void;
 }
 
 const YOUTUBE_API_SRC = 'https://www.youtube.com/iframe_api';
 
-export const useYouTubePlayer = ({ videoId, isPlaying, onStateChange, onError }: UseYouTubePlayerProps) => {
+export const useYouTubePlayer = ({ videoId, isPlaying, onStateChange }: UseYouTubePlayerProps) => {
     const playerRef = useRef<YouTubePlayer | null>(null);
     const intervalRef = useRef<number | null>(null);
     const [isReady, setIsReady] = useState(false);
@@ -32,12 +31,9 @@ export const useYouTubePlayer = ({ videoId, isPlaying, onStateChange, onError }:
     const [volume, setVolumeState] = useState(100);
 
     const onStateChangeRef = useRef(onStateChange);
-    const onErrorRef = useRef(onError);
-
     useEffect(() => {
         onStateChangeRef.current = onStateChange;
-        onErrorRef.current = onError;
-    }, [onStateChange, onError]);
+    }, [onStateChange]);
 
     const clearTimeInterval = () => {
         if (intervalRef.current) {
@@ -68,8 +64,13 @@ export const useYouTubePlayer = ({ videoId, isPlaying, onStateChange, onError }:
                     'onReady': () => {
                         setIsReady(true);
                     },
-                    'onStateChange': (event: any) => onStateChangeRef.current?.(event),
-                    'onError': (event: any) => onErrorRef.current?.(event),
+                    'onStateChange': (event) => onStateChangeRef.current?.(event),
+                    'onError': (event) => {
+                        console.error('[YouTube Player Error]:', event.data);
+                        // 150/101 are embed restrictions, 2 is invalid video id, 5 is HTML5 error.
+                        // We should notify App.tsx that something went wrong.
+                        onStateChangeRef.current?.({ data: -1 }); // Custom error state
+                    }
                 }
             });
         }
@@ -106,44 +107,30 @@ export const useYouTubePlayer = ({ videoId, isPlaying, onStateChange, onError }:
     useEffect(() => {
         if (!isReady) return;
 
-        clearTimeInterval(); // Clear any existing interval
+        clearTimeInterval();
+        
+        const playerState = playerRef.current?.getPlayerState();
+        
         if (isPlaying) {
-            // Panggil playVideo secara eksplisit dan gunakan interval untuk memastikan statusnya 'playing'
-            const attemptPlay = () => {
-                const state = playerRef.current?.getPlayerState();
-                if (state !== 1) { // 1 is Playing
-                    playerRef.current?.playVideo();
-                }
-            };
+            // Attempt to play if not already playing or buffering
+            if (playerState !== 1 && playerState !== 3) {
+                playerRef.current?.playVideo();
+            }
             
-            attemptPlay();
-            // Coba lagi setelah jeda singkat jika belum memutar (antisipasi blokir browser)
-            const retryTimeout = setTimeout(attemptPlay, 1000);
-
             intervalRef.current = window.setInterval(() => {
                 const newDuration = playerRef.current?.getDuration() ?? 0;
                 const newTime = playerRef.current?.getCurrentTime() ?? 0;
-                setDuration(newDuration);
+                if (newDuration > 0) setDuration(newDuration);
                 setCurrentTime(newTime);
-                
-                // Jika isPlaying true tapi player berhenti (bukan karena buffering), coba putar lagi
-                const state = playerRef.current?.getPlayerState();
-                if (isPlaying && state === 2) { // 2 is Paused
-                    // Jangan paksa jika user memang baru saja pause, tapi di sini isPlaying adalah state internal app
-                    // Jika state app 'playing' tapi player 'paused', berarti ada ketidaksinkronan
-                }
             }, 500);
-            
-            return () => {
-                clearTimeInterval();
-                clearTimeout(retryTimeout);
-            };
         } else {
-            playerRef.current?.pauseVideo();
+            if (playerState === 1 || playerState === 3 || playerState === 5) {
+                playerRef.current?.pauseVideo();
+            }
         }
         
         return clearTimeInterval;
-    }, [isReady, isPlaying]);
+    }, [isReady, isPlaying, videoId]);
     
     const setVolume = useCallback((newVolume: number) => {
         if (isReady) {
@@ -158,18 +145,6 @@ export const useYouTubePlayer = ({ videoId, isPlaying, onStateChange, onError }:
             setCurrentTime(seconds);
         }
     }, [isReady]);
-
-    const play = useCallback(() => {
-        if (isReady) {
-            playerRef.current?.playVideo();
-        }
-    }, [isReady]);
-
-    const pause = useCallback(() => {
-        if (isReady) {
-            playerRef.current?.pauseVideo();
-        }
-    }, [isReady]);
     
     useEffect(() => {
         if(isReady) {
@@ -177,7 +152,7 @@ export const useYouTubePlayer = ({ videoId, isPlaying, onStateChange, onError }:
         }
     }, [isReady]);
 
-    return { setVolume, volume, seekTo, currentTime, duration, play, pause };
+    return { setVolume, volume, seekTo, currentTime, duration };
 };
 
 declare global {

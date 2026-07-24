@@ -15,7 +15,7 @@ const NavItem: React.FC<{
     onClick: () => void;
 }> = ({ icon, label, isActive, onClick }) => (
     <button
-        onClick={onClick}
+        onClick={() => { onClick(); if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10); }}
         className={`flex flex-col items-center justify-center w-full pt-2 pb-1 transition-colors duration-200 ${
             isActive ? 'text-brand-red' : 'text-dark-subtext'
         }`}
@@ -34,6 +34,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeView, setActiv
                 isActive={activeView === 'home'}
                 onClick={() => setActiveView('home')}
             />
+
             <NavItem
                 icon="fa-list-ul"
                 label="Playlist"

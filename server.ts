@@ -38,7 +38,7 @@ app.use("/api/youtube", async (req, res) => {
   if (API_KEYS.length === 0) {
     return res.status(500).json({ 
       error: { 
-        message: "Kunci API YouTube belum dikonfigurasi di variabel lingkungan (YOUTUBE_API_KEY_1, YOUTUBE_API_KEY_2). Silakan atur di menu Settings." 
+        message: "YouTube API Keys are not configured in environment variables (YOUTUBE_API_KEY_1, YOUTUBE_API_KEY_2)." 
       } 
     });
   }

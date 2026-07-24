@@ -31,7 +31,6 @@ export interface VideoItem {
     channelTitle: string;
     liveBroadcastContent: string;
     publishTime: string;
-    thumbnailData?: string; // Base64 encoded thumbnail for offline use
   };
 }
 
