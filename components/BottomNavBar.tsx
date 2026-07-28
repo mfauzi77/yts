@@ -1,7 +1,7 @@
 
 import React from 'react';
 
-type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'offline' | 'channel' | 'video';
+type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'offline' | 'channel' | 'video' | 'settings';
 
 interface BottomNavBarProps {
   activeView: MainView;
@@ -45,6 +45,12 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeView, setActiv
                 label="Riwayat"
                 isActive={activeView === 'history'}
                 onClick={() => setActiveView('history')}
+            />
+            <NavItem
+                icon="fa-cog"
+                label="Pengaturan"
+                isActive={activeView === 'settings'}
+                onClick={() => setActiveView('settings')}
             />
         </nav>
     );

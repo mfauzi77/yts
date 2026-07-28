@@ -1,7 +1,7 @@
 
 import React from 'react';
 
-type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'offline' | 'channel' | 'video';
+type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'offline' | 'channel' | 'video' | 'settings';
 
 interface SidebarProps {
   activeView: MainView;
@@ -59,6 +59,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) =
                     label="Koleksi Offline" 
                     isActive={activeView === 'offline'} 
                     onClick={() => setActiveView('offline')} 
+                />
+                 <NavLink 
+                    icon="fa-cog" 
+                    label="Pengaturan" 
+                    isActive={activeView === 'settings'} 
+                    onClick={() => setActiveView('settings')} 
                 />
             </nav>
         </aside>

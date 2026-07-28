@@ -24,9 +24,10 @@ const NowPlayingView = lazy(() => import('./components/NowPlayingView').then(m =
 const ChannelView = lazy(() => import('./components/ChannelView').then(m => ({ default: m.ChannelView })));
 const AddToPlaylistModal = lazy(() => import('./components/AddToPlaylistModal').then(m => ({ default: m.AddToPlaylistModal })));
 const PlaylistDetailView = lazy(() => import('./components/PlaylistDetailView').then(m => ({ default: m.PlaylistDetailView })));
+const SettingsView = lazy(() => import('./components/SettingsView').then(m => ({ default: m.SettingsView })));
 
 
-type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'channel' | 'youtubePlaylistDetail';
+type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'offline' | 'channel' | 'youtubePlaylistDetail' | 'settings';
 type ApiStatus = 'idle' | 'success' | 'error';
 
 const LoadingSpinner: React.FC = () => (
@@ -71,6 +72,12 @@ const App: React.FC = () => {
     const [isShuffle, setIsShuffle] = useLocalStorage<boolean>('ytas-shuffle', false);
     const [likedSongs, setLikedSongs] = useLocalStorage<string[]>('ytas-liked-songs', []);
     const [searchHistory, setSearchHistory] = useLocalStorage<string[]>('ytas-search-history', []);
+
+    // Storage & Auto Cleanup Configuration
+    const [historyLimit, setHistoryLimit] = useLocalStorage<number>('ytas-history-limit', 25);
+    const [historyMaxAgeDays, setHistoryMaxAgeDays] = useLocalStorage<number>('ytas-history-max-age', 30);
+    const [autoCleanupEnabled, setAutoCleanupEnabled] = useLocalStorage<boolean>('ytas-auto-cleanup', true);
+    const [autoClearCacheOnStartup, setAutoClearCacheOnStartup] = useLocalStorage<boolean>('ytas-auto-clear-cache', false);
 
     
     const [activePlaylist, setActivePlaylist] = useState<Playlist | null>(null);
@@ -243,12 +250,51 @@ const App: React.FC = () => {
         }
     }, [setSearchHistory]);
 
+    // Auto-cleanup on app startup or when settings change
+    useEffect(() => {
+        if (!autoCleanupEnabled) return;
+
+        // Auto trim history by max age & history limit
+        setHistory(prevHistory => {
+            let updated = [...prevHistory];
+
+            if (historyMaxAgeDays > 0) {
+                const cutoffTime = Date.now() - historyMaxAgeDays * 24 * 60 * 60 * 1000;
+                updated = updated.filter(item => {
+                    const playedAt = (item as any)._playedAt;
+                    return !playedAt || playedAt >= cutoffTime;
+                });
+            }
+
+            if (updated.length > historyLimit) {
+                updated = updated.slice(0, historyLimit);
+            }
+
+            return updated.length !== prevHistory.length ? updated : prevHistory;
+        });
+
+        // Auto clear API data cache on startup if configured
+        if (autoClearCacheOnStartup && 'caches' in window) {
+            caches.keys().then(keys => {
+                keys.forEach(key => {
+                    if (key.includes('data')) {
+                        caches.delete(key);
+                    }
+                });
+            }).catch(e => console.warn('Auto cache clear error:', e));
+        }
+    }, [autoCleanupEnabled, historyLimit, historyMaxAgeDays, autoClearCacheOnStartup, setHistory]);
+
     const addToHistory = useCallback((track: VideoItem) => {
         setHistory(prevHistory => {
-            const newHistory = [track, ...prevHistory.filter(item => item.id.videoId !== track.id.videoId)];
-            return newHistory.slice(0, 50);
+            const trackWithTimestamp = {
+                ...track,
+                _playedAt: Date.now()
+            };
+            const newHistory = [trackWithTimestamp, ...prevHistory.filter(item => item.id.videoId !== track.id.videoId)];
+            return newHistory.slice(0, historyLimit);
         });
-    }, [setHistory]);
+    }, [setHistory, historyLimit]);
 
     const handleSelectTrack = useCallback((track: VideoItem, contextList: VideoItem[] = []) => {
         setCurrentTrack(track);
@@ -442,6 +488,48 @@ const App: React.FC = () => {
                 }
             }
         }
+
+        // Expose global JS interface for Android Mini-Browser / WebView
+        (window as any).YTS_PLAYER = {
+            play: () => { setIsPlaying(true); play(); },
+            pause: () => { setIsPlaying(false); pause(); },
+            toggle: () => {
+                if (isPlaying) { setIsPlaying(false); pause(); }
+                else { setIsPlaying(true); play(); }
+            },
+            next: playNext,
+            prev: playPrev,
+            getState: () => ({
+                isPlaying,
+                title: currentTrack?.snippet.title || '',
+                artist: currentTrack?.snippet.channelTitle || '',
+                thumbnail: currentTrack?.snippet.thumbnails.medium?.url || currentTrack?.snippet.thumbnails.default.url || '',
+                currentTime: activeCurrentTime,
+                duration: activeDuration,
+            })
+        };
+
+        // Notify Android Native WebView if JavascriptInterface "AndroidBridge" is injected
+        if ((window as any).AndroidBridge && currentTrack) {
+            try {
+                if (typeof (window as any).AndroidBridge.onTrackChanged === 'function') {
+                    (window as any).AndroidBridge.onTrackChanged(JSON.stringify({
+                        title: currentTrack.snippet.title,
+                        artist: currentTrack.snippet.channelTitle,
+                        thumbnail: currentTrack.snippet.thumbnails.medium?.url || currentTrack.snippet.thumbnails.default.url,
+                        videoId: currentTrack.id.videoId,
+                        isPlaying,
+                        duration: activeDuration,
+                        currentTime: activeCurrentTime
+                    }));
+                }
+                if (typeof (window as any).AndroidBridge.onPlaybackStateChanged === 'function') {
+                    (window as any).AndroidBridge.onPlaybackStateChanged(isPlaying);
+                }
+            } catch (e) {
+                console.warn('AndroidBridge call error:', e);
+            }
+        }
     }, [currentTrack, isPlaying, playNext, playPrev, activeCurrentTime, activeDuration, activeSeekTo, play, pause]);
 
     const handleOpenAddToPlaylistModal = (track: VideoItem) => setModalTrack(track);
@@ -624,15 +712,35 @@ const App: React.FC = () => {
                     onDownloadTrack={handleDownloadTrack}
                     onDeleteDownload={deleteOfflineTrack}
                 />;
+            case 'settings':
+                return <SettingsView
+                    history={history}
+                    setHistory={setHistory}
+                    searchHistory={searchHistory}
+                    setSearchHistory={setSearchHistory}
+                    offlineItems={offlineItems}
+                    setOfflineItems={setOfflineItems}
+                    playlists={playlists}
+                    historyLimit={historyLimit}
+                    setHistoryLimit={setHistoryLimit}
+                    historyMaxAgeDays={historyMaxAgeDays}
+                    setHistoryMaxAgeDays={setHistoryMaxAgeDays}
+                    autoCleanupEnabled={autoCleanupEnabled}
+                    setAutoCleanupEnabled={setAutoCleanupEnabled}
+                    autoClearCacheOnStartup={autoClearCacheOnStartup}
+                    setAutoClearCacheOnStartup={setAutoClearCacheOnStartup}
+                    onBack={() => setActiveView('home')}
+                />;
             default: return null;
         }
     }
 
     const viewTitles: { [key in MainView]?: string } = {
         home: 'Beranda',
-
         playlists: 'Playlist',
         history: 'Riwayat',
+        offline: 'Koleksi Offline',
+        settings: 'Pengaturan & Pembersihan',
     };
 
     return (
