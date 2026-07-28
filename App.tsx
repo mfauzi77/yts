@@ -832,7 +832,7 @@ const App: React.FC = () => {
                 
                 <Suspense fallback={null}>
                     {currentTrack && (
-                        <footer className="col-span-1 md:col-span-2 z-30">
+                        <footer className="col-span-1 md:col-span-2 z-30 fixed bottom-14 left-0 right-0 md:static md:bottom-auto">
                             <Player
                                 track={currentTrack}
                                 isPlaying={isPlaying}

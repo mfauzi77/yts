@@ -59,24 +59,34 @@ export const Player: React.FC<PlayerProps> = ({
             </div>
             
             {/* Mobile View */}
-            <div className="md:hidden p-2 flex items-center justify-between">
-                <div className="flex items-center space-x-3 min-w-0 flex-1">
+            <div className="md:hidden px-3 py-2 flex items-center justify-between bg-dark-surface/95 backdrop-blur-md shadow-lg border-t border-white/10">
+                <div className="flex items-center space-x-3 min-w-0 flex-1 cursor-pointer" onClick={onToggleNowPlaying}>
                     <img 
                         src={track.snippet.thumbnails.default.url} 
                         alt={track.snippet.title} 
-                        className="w-12 h-12 rounded-md object-cover cursor-pointer flex-shrink-0"
-                        onClick={onToggleNowPlaying}
+                        className="w-11 h-11 rounded-md object-cover flex-shrink-0 border border-white/10 shadow-md"
                     />
                     <div className="min-w-0">
-                        <p className="font-semibold text-sm cursor-pointer text-white truncate" onClick={onToggleNowPlaying}>{track.snippet.title}</p>
-                        <p className="text-xs text-dark-subtext truncate cursor-pointer hover:underline" onClick={handleChannelClick}>
+                        <p className="font-semibold text-sm text-white truncate">{track.snippet.title}</p>
+                        <p className="text-xs text-dark-subtext truncate hover:underline" onClick={handleChannelClick}>
                             {track.snippet.channelTitle}
                         </p>
                     </div>
                 </div>
-                <div className="flex items-center space-x-2 flex-shrink-0 pl-2">
-                    <button onClick={() => setIsPlaying(!isPlaying)} className="w-10 h-10 flex items-center justify-center text-white">
-                        <i className={`fas ${isPlaying ? 'fa-pause' : 'fa-play'} text-2xl`}></i>
+                <div className="flex items-center space-x-1.5 flex-shrink-0 pl-2">
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); setIsPlaying(!isPlaying); }} 
+                        className="w-9 h-9 flex items-center justify-center bg-brand-red text-white rounded-full shadow hover:bg-red-700 transition-transform active:scale-95"
+                        aria-label={isPlaying ? 'Jeda' : 'Putar'}
+                    >
+                        <i className={`fas ${isPlaying ? 'fa-pause' : 'fa-play'} text-xs`}></i>
+                    </button>
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); onNext(); }} 
+                        className="w-9 h-9 flex items-center justify-center text-dark-subtext hover:text-white transition-colors active:scale-95"
+                        aria-label="Lagu Berikutnya"
+                    >
+                        <i className="fas fa-step-forward text-sm"></i>
                     </button>
                 </div>
             </div>
