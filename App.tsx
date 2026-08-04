@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 import { SearchBar } from './components/SearchBar';
 import { getChannelVideos, getRelatedVideos, searchVideos, getChannelPlaylists, getPlaylistItems } from './services/youtubeService';
 import { useLocalStorage } from './hooks/useLocalStorage';
@@ -78,6 +78,61 @@ const App: React.FC = () => {
     const [historyMaxAgeDays, setHistoryMaxAgeDays] = useLocalStorage<number>('ytas-history-max-age', 30);
     const [autoCleanupEnabled, setAutoCleanupEnabled] = useLocalStorage<boolean>('ytas-auto-cleanup', true);
     const [autoClearCacheOnStartup, setAutoClearCacheOnStartup] = useLocalStorage<boolean>('ytas-auto-clear-cache', false);
+
+    // Sleep Timer State
+    const [sleepTimerEndTime, setSleepTimerEndTime] = useState<number | null>(null);
+    const [sleepTimerRemaining, setSleepTimerRemaining] = useState<number | null>(null);
+
+    const activeSetVolumeRef = useRef<(vol: number) => void>(() => {});
+    const baseVolumeRef = useRef<number>(100);
+    const sleepTimerEndTimeRef = useRef<number | null>(null);
+
+    const handleSetSleepTimer = useCallback((minutes: number | null) => {
+        if (minutes === null || minutes <= 0) {
+            if (sleepTimerEndTimeRef.current && (sleepTimerEndTimeRef.current - Date.now()) <= 10000) {
+                activeSetVolumeRef.current(baseVolumeRef.current);
+            }
+            setSleepTimerEndTime(null);
+            setSleepTimerRemaining(null);
+        } else {
+            const endTime = Date.now() + minutes * 60 * 1000;
+            setSleepTimerEndTime(endTime);
+            setSleepTimerRemaining(minutes * 60);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!sleepTimerEndTime) {
+            setSleepTimerRemaining(null);
+            return;
+        }
+
+        const updateTimer = () => {
+            const now = Date.now();
+            const diffMs = sleepTimerEndTime - now;
+            if (diffMs <= 0) {
+                setIsPlaying(false);
+                if (baseVolumeRef.current !== undefined) {
+                    activeSetVolumeRef.current(baseVolumeRef.current);
+                }
+                setSleepTimerEndTime(null);
+                setSleepTimerRemaining(null);
+                setError("Pengatur waktu tidur telah berakhir. Pemutaran musik dihentikan.");
+            } else {
+                setSleepTimerRemaining(Math.ceil(diffMs / 1000));
+
+                if (diffMs <= 10000) {
+                    const fraction = Math.max(0, diffMs / 10000);
+                    const targetVolume = Math.round(baseVolumeRef.current * fraction);
+                    activeSetVolumeRef.current(targetVolume);
+                }
+            }
+        };
+
+        updateTimer();
+        const interval = setInterval(updateTimer, 500);
+        return () => clearInterval(interval);
+    }, [sleepTimerEndTime]);
 
     
     const [activePlaylist, setActivePlaylist] = useState<Playlist | null>(null);
@@ -314,10 +369,6 @@ const App: React.FC = () => {
 
         setActivePlaybackList(contextList);
         currentTrackIndexRef.current = contextList.findIndex(item => item.id.videoId === track.id.videoId);
-        
-        if (window.innerWidth < 768) {
-            setIsNowPlayingViewOpen(true);
-        }
     }, [addToHistory, offlineItems, setSyncedOfflineIds]);
 
     const playNext = useCallback(() => {
@@ -395,9 +446,45 @@ const App: React.FC = () => {
     const activeVolume      = offlinePlayerData.isLocalMode ? offlinePlayerData.localVolume      : volume;
     const activeSetVolume   = offlinePlayerData.isLocalMode ? offlinePlayerData.localSetVolume   : setVolume;
 
-    // Media Session API for mobile browser, Android mini-browser & notification controls
+    useEffect(() => { activeSetVolumeRef.current = activeSetVolume; }, [activeSetVolume]);
+    useEffect(() => { sleepTimerEndTimeRef.current = sleepTimerEndTime; }, [sleepTimerEndTime]);
     useEffect(() => {
-        if ('mediaSession' in navigator && currentTrack) {
+        const isFading = sleepTimerEndTime !== null && (sleepTimerEndTime - Date.now()) <= 10000;
+        if (!isFading && activeVolume > 0) {
+            baseVolumeRef.current = activeVolume;
+        }
+    }, [activeVolume, sleepTimerEndTime]);
+
+    const activePlaybackProgress = (activeDuration > 0 && !isNaN(activeCurrentTime) && !isNaN(activeDuration)) 
+        ? Math.min(Math.max(Math.round((activeCurrentTime / activeDuration) * 100), 0), 100) 
+        : 0;
+
+    // Store latest state & callbacks in refs to prevent MediaSession action handlers from re-registering on every tick
+    const playRef = useRef(play);
+    const pauseRef = useRef(pause);
+    const playNextRef = useRef(playNext);
+    const playPrevRef = useRef(playPrev);
+    const activeSeekToRef = useRef(activeSeekTo);
+    const isPlayingRef = useRef(isPlaying);
+    const currentTrackRef = useRef(currentTrack);
+    const activeCurrentTimeRef = useRef(activeCurrentTime);
+    const activeDurationRef = useRef(activeDuration);
+
+    useEffect(() => { playRef.current = play; }, [play]);
+    useEffect(() => { pauseRef.current = pause; }, [pause]);
+    useEffect(() => { playNextRef.current = playNext; }, [playNext]);
+    useEffect(() => { playPrevRef.current = playPrev; }, [playPrev]);
+    useEffect(() => { activeSeekToRef.current = activeSeekTo; }, [activeSeekTo]);
+    useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
+    useEffect(() => { currentTrackRef.current = currentTrack; }, [currentTrack]);
+    useEffect(() => { activeCurrentTimeRef.current = activeCurrentTime; }, [activeCurrentTime]);
+    useEffect(() => { activeDurationRef.current = activeDuration; }, [activeDuration]);
+
+    // 1. Setup MediaSession metadata & Action Handlers ONCE per track change
+    useEffect(() => {
+        if (!currentTrack) return;
+
+        if ('mediaSession' in navigator) {
             try {
                 navigator.mediaSession.metadata = new MediaMetadata({
                     title: currentTrack.snippet.title,
@@ -413,15 +500,11 @@ const App: React.FC = () => {
                 console.warn('Failed to set MediaMetadata:', e);
             }
 
-            // Sync playbackState synchronously for OS/browser media notification UI
-            navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
-
-            // Safe action handler assignment helper
             const setHandler = (action: MediaSessionAction, handler: MediaSessionActionHandler | null) => {
                 try {
                     navigator.mediaSession.setActionHandler(action, handler);
                 } catch {
-                    // Handler not supported on current browser version
+                    // Handler not supported on browser
                 }
             };
 
@@ -429,7 +512,7 @@ const App: React.FC = () => {
                 try {
                     navigator.mediaSession.playbackState = 'playing';
                     setIsPlaying(true);
-                    play();
+                    playRef.current();
                 } catch (e) {
                     console.error('MediaSession play error:', e);
                 }
@@ -439,7 +522,7 @@ const App: React.FC = () => {
                 try {
                     navigator.mediaSession.playbackState = 'paused';
                     setIsPlaying(false);
-                    pause();
+                    pauseRef.current();
                 } catch (e) {
                     console.error('MediaSession pause error:', e);
                 }
@@ -449,68 +532,34 @@ const App: React.FC = () => {
                 try {
                     navigator.mediaSession.playbackState = 'none';
                     setIsPlaying(false);
-                    pause();
+                    pauseRef.current();
                 } catch (e) {
                     console.error('MediaSession stop error:', e);
                 }
             });
 
-            setHandler('previoustrack', () => playPrev());
-            setHandler('nexttrack', () => playNext());
+            setHandler('previoustrack', () => playPrevRef.current());
+            setHandler('nexttrack', () => playNextRef.current());
 
             setHandler('seekto', (details) => {
                 if (details.seekTime !== undefined && !isNaN(details.seekTime)) {
-                    activeSeekTo(details.seekTime);
+                    activeSeekToRef.current(details.seekTime);
                 }
             });
 
             setHandler('seekbackward', (details) => {
                 const offset = details.seekOffset || 10;
-                activeSeekTo(Math.max((activeCurrentTime || 0) - offset, 0));
+                activeSeekToRef.current(Math.max((activeCurrentTimeRef.current || 0) - offset, 0));
             });
 
             setHandler('seekforward', (details) => {
                 const offset = details.seekOffset || 10;
-                activeSeekTo(Math.min((activeCurrentTime || 0) + offset, activeDuration || 0));
+                activeSeekToRef.current(Math.min((activeCurrentTimeRef.current || 0) + offset, activeDurationRef.current || 0));
             });
-
-            // Update position state safely
-            if ('setPositionState' in navigator.mediaSession && activeDuration > 0 && !isNaN(activeDuration) && !isNaN(activeCurrentTime)) {
-                try {
-                    const validPosition = Math.min(Math.max(activeCurrentTime, 0), activeDuration);
-                    navigator.mediaSession.setPositionState({
-                        duration: activeDuration,
-                        playbackRate: 1,
-                        position: validPosition
-                    });
-                } catch {
-                    // Ignore position state errors
-                }
-            }
         }
 
-        // Expose global JS interface for Android Mini-Browser / WebView
-        (window as any).YTS_PLAYER = {
-            play: () => { setIsPlaying(true); play(); },
-            pause: () => { setIsPlaying(false); pause(); },
-            toggle: () => {
-                if (isPlaying) { setIsPlaying(false); pause(); }
-                else { setIsPlaying(true); play(); }
-            },
-            next: playNext,
-            prev: playPrev,
-            getState: () => ({
-                isPlaying,
-                title: currentTrack?.snippet.title || '',
-                artist: currentTrack?.snippet.channelTitle || '',
-                thumbnail: currentTrack?.snippet.thumbnails.medium?.url || currentTrack?.snippet.thumbnails.default.url || '',
-                currentTime: activeCurrentTime,
-                duration: activeDuration,
-            })
-        };
-
-        // Notify Android Native WebView if JavascriptInterface "AndroidBridge" is injected
-        if ((window as any).AndroidBridge && currentTrack) {
+        // Notify Android Native WebView ONCE on track change
+        if ((window as any).AndroidBridge) {
             try {
                 if (typeof (window as any).AndroidBridge.onTrackChanged === 'function') {
                     (window as any).AndroidBridge.onTrackChanged(JSON.stringify({
@@ -518,19 +567,68 @@ const App: React.FC = () => {
                         artist: currentTrack.snippet.channelTitle,
                         thumbnail: currentTrack.snippet.thumbnails.medium?.url || currentTrack.snippet.thumbnails.default.url,
                         videoId: currentTrack.id.videoId,
-                        isPlaying,
-                        duration: activeDuration,
-                        currentTime: activeCurrentTime
+                        isPlaying: isPlayingRef.current,
+                        duration: activeDurationRef.current,
+                        currentTime: activeCurrentTimeRef.current
                     }));
-                }
-                if (typeof (window as any).AndroidBridge.onPlaybackStateChanged === 'function') {
-                    (window as any).AndroidBridge.onPlaybackStateChanged(isPlaying);
                 }
             } catch (e) {
                 console.warn('AndroidBridge call error:', e);
             }
         }
-    }, [currentTrack, isPlaying, playNext, playPrev, activeCurrentTime, activeDuration, activeSeekTo, play, pause]);
+    }, [currentTrack]);
+
+    // 2. Sync playbackState when isPlaying changes
+    useEffect(() => {
+        if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+        }
+        if ((window as any).AndroidBridge && typeof (window as any).AndroidBridge.onPlaybackStateChanged === 'function') {
+            try {
+                (window as any).AndroidBridge.onPlaybackStateChanged(isPlaying);
+            } catch (e) {
+                console.warn('AndroidBridge onPlaybackStateChanged error:', e);
+            }
+        }
+    }, [isPlaying]);
+
+    // 3. Sync positionState when activeCurrentTime / activeDuration changes
+    useEffect(() => {
+        if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession && activeDuration > 0 && !isNaN(activeDuration) && !isNaN(activeCurrentTime)) {
+            try {
+                const validPosition = Math.min(Math.max(activeCurrentTime, 0), activeDuration);
+                navigator.mediaSession.setPositionState({
+                    duration: activeDuration,
+                    playbackRate: 1,
+                    position: validPosition
+                });
+            } catch {
+                // Ignore position state errors
+            }
+        }
+    }, [activeCurrentTime, activeDuration]);
+
+    // 4. Register window.YTS_PLAYER for global JS calls from Android / browser extension
+    useEffect(() => {
+        (window as any).YTS_PLAYER = {
+            play: () => { setIsPlaying(true); playRef.current(); },
+            pause: () => { setIsPlaying(false); pauseRef.current(); },
+            toggle: () => {
+                if (isPlayingRef.current) { setIsPlaying(false); pauseRef.current(); }
+                else { setIsPlaying(true); playRef.current(); }
+            },
+            next: () => playNextRef.current(),
+            prev: () => playPrevRef.current(),
+            getState: () => ({
+                isPlaying: isPlayingRef.current,
+                title: currentTrackRef.current?.snippet.title || '',
+                artist: currentTrackRef.current?.snippet.channelTitle || '',
+                thumbnail: currentTrackRef.current?.snippet.thumbnails.medium?.url || currentTrackRef.current?.snippet.thumbnails.default.url || '',
+                currentTime: activeCurrentTimeRef.current,
+                duration: activeDurationRef.current,
+            })
+        };
+    }, []);
 
     const handleOpenAddToPlaylistModal = (track: VideoItem) => setModalTrack(track);
     const handleCloseAddToPlaylistModal = () => setModalTrack(null);
@@ -542,6 +640,12 @@ const App: React.FC = () => {
             }
             return p;
         }));
+        setActivePlaylist(prev => {
+            if (prev && prev.id === playlistId && !prev.tracks.some(t => t.id.videoId === track.id.videoId)) {
+                return { ...prev, tracks: [...prev.tracks, track] };
+            }
+            return prev;
+        });
     };
 
     const handleCreatePlaylistAndAdd = (name: string, track: VideoItem) => {
@@ -614,11 +718,11 @@ const App: React.FC = () => {
                     onOpenAddToPlaylistModal={handleOpenAddToPlaylistModal}
                     onSelectChannel={handleSelectChannel}
                     viewType={isShowingSearchResults ? 'search' : 'recommendations'}
-                    onGenerateDiscoveryMix={fetchPersonalizedRecommendations}
 
                     offlineItems={offlineItems}
                     onAddToOffline={handleAddToOffline}
                     currentTrackId={currentTrack?.id.videoId}
+                    playbackProgress={activePlaybackProgress}
                     getDownloadState={getDownloadState}
                     onDownloadTrack={handleDownloadTrack}
                     onDeleteDownload={deleteOfflineTrack}
@@ -635,9 +739,13 @@ const App: React.FC = () => {
                  return <PlaylistDetailView
                     playlist={activePlaylist}
                     onSelectTrack={handleSelectTrack}
-                    onRemoveFromPlaylist={(trackId) => setPlaylists(prev => prev.map(p => p.id === activePlaylist.id ? {...p, tracks: p.tracks.filter(t => t.id.videoId !== trackId)} : p))}
+                    onRemoveFromPlaylist={(trackId) => {
+                        setPlaylists(prev => prev.map(p => p.id === activePlaylist.id ? {...p, tracks: p.tracks.filter(t => t.id.videoId !== trackId)} : p));
+                        setActivePlaylist(prev => prev ? {...prev, tracks: prev.tracks.filter(t => t.id.videoId !== trackId)} : null);
+                    }}
                     onSelectChannel={handleSelectChannel}
                     currentTrackId={currentTrack?.id.videoId}
+                    playbackProgress={activePlaybackProgress}
                     isAutoplayEnabled={isAutoplayEnabled}
                     onToggleAutoplay={() => setIsAutoplayEnabled(p => !p)}
                     isShuffle={isShuffle}
@@ -646,7 +754,10 @@ const App: React.FC = () => {
                     onAddToOffline={handleAddToOffline}
                     onBack={() => setActiveView('playlists')}
                     onDelete={() => { setPlaylists(p => p.filter(pl => pl.id !== activePlaylist.id)); setActiveView('playlists'); }}
-                    onRename={(newName) => setPlaylists(p => p.map(pl => pl.id === activePlaylist.id ? {...pl, name: newName} : pl))}
+                    onRename={(newName) => {
+                        setPlaylists(p => p.map(pl => pl.id === activePlaylist.id ? {...pl, name: newName} : pl));
+                        setActivePlaylist(prev => prev ? {...prev, name: newName} : null);
+                    }}
                     getDownloadState={getDownloadState}
                     onDownloadTrack={handleDownloadTrack}
                     onDeleteDownload={deleteOfflineTrack}
@@ -660,6 +771,7 @@ const App: React.FC = () => {
                     offlineItems={offlineItems}
                     onAddToOffline={handleAddToOffline}
                     currentTrackId={currentTrack?.id.videoId}
+                    playbackProgress={activePlaybackProgress}
                     getDownloadState={getDownloadState}
                     onDownloadTrack={handleDownloadTrack}
                     onDeleteDownload={deleteOfflineTrack}
@@ -680,6 +792,7 @@ const App: React.FC = () => {
                     onAddToOffline={handleAddToOffline}
                     offlineItems={offlineItems}
                     currentTrackId={currentTrack?.id.videoId}
+                    playbackProgress={activePlaybackProgress}
                     onLoadMore={() => {}}
                     hasNextPage={!!channelNextPageToken}
                     getDownloadState={getDownloadState}
@@ -698,6 +811,7 @@ const App: React.FC = () => {
                     onRemoveFromPlaylist={() => {}} // Cannot remove from YouTube playlist
                     onSelectChannel={handleSelectChannel}
                     currentTrackId={currentTrack?.id.videoId}
+                    playbackProgress={activePlaybackProgress}
                     isAutoplayEnabled={isAutoplayEnabled}
                     onToggleAutoplay={() => setIsAutoplayEnabled(p => !p)}
                     isShuffle={isShuffle}
@@ -729,6 +843,8 @@ const App: React.FC = () => {
                     setAutoCleanupEnabled={setAutoCleanupEnabled}
                     autoClearCacheOnStartup={autoClearCacheOnStartup}
                     setAutoClearCacheOnStartup={setAutoClearCacheOnStartup}
+                    sleepTimerRemaining={sleepTimerRemaining}
+                    onSetSleepTimer={handleSetSleepTimer}
                     onBack={() => setActiveView('home')}
                 />;
             default: return null;
@@ -801,12 +917,24 @@ const App: React.FC = () => {
                         <h1 className="text-3xl md:text-4xl font-bold text-white">
                             {viewTitles[activeView] || 'YTS'}
                         </h1>
-                        {!navigator.onLine && (
-                            <div className="flex items-center text-yellow-500 text-sm font-semibold bg-yellow-500/10 px-3 py-1 rounded-full border border-yellow-500/20">
-                                <i className="fas fa-wifi-slash mr-2"></i>
-                                Offline
-                            </div>
-                        )}
+                        <div className="flex items-center gap-2">
+                            {sleepTimerRemaining !== null && sleepTimerRemaining > 0 && (
+                                <button
+                                    onClick={() => setActiveView('settings')}
+                                    className="flex items-center text-indigo-300 text-xs font-semibold bg-indigo-500/20 hover:bg-indigo-500/30 px-3 py-1.5 rounded-full border border-indigo-500/40 gap-1.5 transition-colors"
+                                    title="Pengatur Waktu Tidur Aktif - Klik untuk kelola"
+                                >
+                                    <i className="fas fa-moon text-indigo-400 animate-pulse"></i>
+                                    <span>{Math.floor(sleepTimerRemaining / 60)}m {sleepTimerRemaining % 60}s</span>
+                                </button>
+                            )}
+                            {!navigator.onLine && (
+                                <div className="flex items-center text-yellow-500 text-sm font-semibold bg-yellow-500/10 px-3 py-1 rounded-full border border-yellow-500/20">
+                                    <i className="fas fa-wifi-slash mr-2"></i>
+                                    Offline
+                                </div>
+                            )}
+                        </div>
                     </div>
                     
                     <header className="flex-shrink-0 z-10 p-2 md:p-4">
@@ -862,7 +990,7 @@ const App: React.FC = () => {
                 <Suspense fallback={null}>
                     {currentTrack && (
                         <NowPlayingView
-                            isOpen={isNowPlayingViewOpen}
+                            isOpen={isNowPlayingViewOpen && typeof window !== 'undefined' && window.innerWidth >= 768}
                             onClose={() => setIsNowPlayingViewOpen(false)}
                             track={currentTrack}
                             isPlaying={isPlaying}

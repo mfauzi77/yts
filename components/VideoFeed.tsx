@@ -9,6 +9,7 @@ interface VideoFeedProps {
   offlineItems: VideoItem[];
   onAddToOffline: (track: VideoItem) => void;
   currentTrackId?: string | null;
+  playbackProgress?: number;
 }
 
 const MusicCard: React.FC<{
@@ -19,7 +20,8 @@ const MusicCard: React.FC<{
     isOffline: boolean;
     onAddToOffline: () => void;
     isPlaying: boolean;
-}> = ({ item, onSelectTrack, onOpenAddToPlaylistModal, onSelectChannel, isOffline, onAddToOffline, isPlaying }) => (
+    playbackProgress?: number;
+}> = ({ item, onSelectTrack, onOpenAddToPlaylistModal, onSelectChannel, isOffline, onAddToOffline, isPlaying, playbackProgress }) => (
     <div className="group relative bg-dark-card rounded-lg overflow-hidden hover:bg-dark-surface transition-all duration-300 hover:shadow-xl">
         <div className="aspect-square relative cursor-pointer" onClick={onSelectTrack}>
             <img
@@ -28,6 +30,12 @@ const MusicCard: React.FC<{
                 className="w-full h-full object-cover"
             />
             <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors"></div>
+            {isPlaying && typeof playbackProgress === 'number' && (
+                <div className="absolute top-2 left-2 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-red text-white text-xs font-mono font-bold shadow-md">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                    <span>{playbackProgress}%</span>
+                </div>
+            )}
             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                  <div className="w-12 h-12 bg-brand-red/90 rounded-full flex items-center justify-center shadow-lg">
                     <i className="fas fa-play text-white ml-1"></i>
@@ -56,14 +64,9 @@ const MusicCard: React.FC<{
                     <button
                         onClick={(e) => { e.stopPropagation(); onOpenAddToPlaylistModal(); }}
                         className="p-1.5 rounded-full text-dark-subtext hover:text-white hover:bg-white/10 transition-colors"
+                        title="Tambahkan ke playlist"
                     >
                         <i className="fas fa-plus"></i>
-                    </button>
-                     <button
-                        onClick={(e) => { e.stopPropagation(); onAddToOffline(); }}
-                        className={`p-1.5 rounded-full transition-colors ${isOffline ? 'text-green-500' : 'text-dark-subtext hover:text-white hover:bg-white/10'}`}
-                    >
-                        <i className={`fas ${isOffline ? 'fa-check-circle' : 'fa-cloud-download-alt'}`}></i>
                     </button>
                 </div>
             </div>
@@ -77,7 +80,8 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
     onSelectChannel, 
     offlineItems, 
     onAddToOffline, 
-    currentTrackId 
+    currentTrackId,
+    playbackProgress
 }) => {
     const [videos, setVideos] = useState<VideoItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -135,6 +139,7 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
                         isOffline={offlineItems.some(o => o.id.videoId === item.id.videoId)}
                         onAddToOffline={() => onAddToOffline(item)}
                         isPlaying={currentTrackId === item.id.videoId}
+                        playbackProgress={currentTrackId === item.id.videoId ? playbackProgress : undefined}
                     />
                 ))}
             </div>

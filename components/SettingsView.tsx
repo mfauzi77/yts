@@ -20,6 +20,10 @@ interface SettingsViewProps {
     autoClearCacheOnStartup: boolean;
     setAutoClearCacheOnStartup: (enabled: boolean) => void;
     
+    // Sleep Timer
+    sleepTimerRemaining: number | null;
+    onSetSleepTimer: (minutes: number | null) => void;
+    
     // Actions
     onBack?: () => void;
 }
@@ -48,6 +52,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setAutoCleanupEnabled,
     autoClearCacheOnStartup,
     setAutoClearCacheOnStartup,
+    sleepTimerRemaining,
+    onSetSleepTimer,
     onBack,
 }) => {
     const [stats, setStats] = useState<StorageStats>({
@@ -60,6 +66,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     
     const [isCleaning, setIsCleaning] = useState(false);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
+    const [customMinutes, setCustomMinutes] = useState<string>('');
+
+    const formatTimerSeconds = (totalSeconds: number) => {
+        const hours = Math.floor(totalSeconds / 3600);
+        const mins = Math.floor((totalSeconds % 3600) / 60);
+        const secs = totalSeconds % 60;
+        if (hours > 0) {
+            return `${hours}:${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
+        }
+        return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    };
 
     const showToast = (msg: string) => {
         setToastMessage(msg);
@@ -264,6 +281,97 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     </button>
                 </div>
             )}
+
+            {/* Sleep Timer Card */}
+            <div className="bg-dark-card border border-neutral-800 rounded-xl p-5 space-y-4 shadow-lg">
+                <div className="flex justify-between items-center border-b border-neutral-800/80 pb-3">
+                    <div>
+                        <h3 className="text-base font-semibold flex items-center gap-2">
+                            <i className="fas fa-moon text-indigo-400"></i> Pengatur Waktu Tidur (Sleep Timer)
+                        </h3>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                            Otomatis menghentikan pemutaran musik setelah durasi waktu yang Anda tentukan, dilengkapi transisi halus (Volume Fade-Out 10 detik terakhir).
+                        </p>
+                    </div>
+                    {sleepTimerRemaining !== null && sleepTimerRemaining > 0 && (
+                        <div className="flex items-center gap-2 bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 px-3 py-1.5 rounded-full text-xs font-mono font-bold">
+                            <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></span>
+                            <span>{formatTimerSeconds(sleepTimerRemaining)}</span>
+                        </div>
+                    )}
+                </div>
+
+                {sleepTimerRemaining !== null && sleepTimerRemaining > 0 ? (
+                    <div className="p-4 bg-indigo-950/30 border border-indigo-800/50 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 flex-shrink-0">
+                                <i className="fas fa-bed text-lg"></i>
+                            </div>
+                            <div>
+                                <p className="text-sm font-semibold text-indigo-200">Timer Aktif: {formatTimerSeconds(sleepTimerRemaining)} tersisa</p>
+                                <p className="text-xs text-indigo-300/80">Pemutaran musik akan otomatis dihentikan secara halus dengan fade-out 10 detik terakhir.</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => {
+                                onSetSleepTimer(null);
+                                showToast('Pengatur waktu tidur dibatalkan.');
+                            }}
+                            className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-red-400 hover:text-red-300 text-xs font-semibold rounded-lg transition-colors border border-neutral-700 flex-shrink-0"
+                        >
+                            <i className="fas fa-stop-circle mr-1.5"></i> Batalkan Timer
+                        </button>
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        <p className="text-xs font-medium text-gray-300">Pilih durasi pengatur waktu tidur:</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                            {[15, 30, 45, 60, 90].map((mins) => (
+                                <button
+                                    key={mins}
+                                    onClick={() => {
+                                        onSetSleepTimer(mins);
+                                        showToast(`Pengatur waktu tidur diatur ke ${mins} menit.`);
+                                    }}
+                                    className="py-2.5 px-3 bg-dark-surface hover:bg-neutral-800 border border-neutral-800 hover:border-indigo-500/50 text-xs font-semibold rounded-xl text-white transition-all flex flex-col items-center justify-center gap-1 group"
+                                >
+                                    <i className="fas fa-clock text-indigo-400 group-hover:scale-110 transition-transform"></i>
+                                    <span>{mins} Menit</span>
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="pt-2 flex flex-col sm:flex-row items-center gap-2">
+                            <span className="text-xs text-gray-400 whitespace-nowrap">Atau masukan menit khusus:</span>
+                            <div className="flex items-center gap-2 w-full sm:w-auto">
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max="600"
+                                    value={customMinutes}
+                                    onChange={(e) => setCustomMinutes(e.target.value)}
+                                    placeholder="Contoh: 20"
+                                    className="bg-neutral-800 text-white text-xs rounded-lg px-3 py-2 border border-neutral-700 focus:outline-none focus:border-indigo-500 w-full sm:w-32"
+                                />
+                                <button
+                                    onClick={() => {
+                                        const mins = parseInt(customMinutes, 10);
+                                        if (!isNaN(mins) && mins > 0) {
+                                            onSetSleepTimer(mins);
+                                            showToast(`Pengatur waktu tidur diatur ke ${mins} menit.`);
+                                            setCustomMinutes('');
+                                        }
+                                    }}
+                                    disabled={!customMinutes || parseInt(customMinutes, 10) <= 0}
+                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap"
+                                >
+                                    Set Timer
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
 
             {/* Storage Usage Dashboard Card */}
             <div className="bg-dark-card border border-neutral-800 rounded-xl p-5 space-y-4 shadow-lg">

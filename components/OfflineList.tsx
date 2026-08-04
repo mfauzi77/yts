@@ -12,6 +12,7 @@ interface OfflineListProps {
   isSyncing: boolean;
   onStartSync: () => void;
   syncingTrackProgress: number;
+  playbackProgress?: number;
 }
 
 const OfflineItem: React.FC<{
@@ -24,7 +25,8 @@ const OfflineItem: React.FC<{
     isSynced: boolean;
     isSyncing: boolean;
     offlinePlaylist: VideoItem[];
-}> = ({ item, index, onSelectTrack, onRemoveFromOfflinePlaylist, onSelectChannel, isPlaying, isSynced, isSyncing, offlinePlaylist }) => {
+    playbackProgress?: number;
+}> = ({ item, index, onSelectTrack, onRemoveFromOfflinePlaylist, onSelectChannel, isPlaying, isSynced, isSyncing, offlinePlaylist, playbackProgress }) => {
     
     return (
         <div className="grid grid-cols-[20px_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
@@ -60,6 +62,12 @@ const OfflineItem: React.FC<{
                 </div>
             </div>
             <div className="flex items-center space-x-3 flex-shrink-0">
+                {isPlaying && typeof playbackProgress === 'number' && (
+                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-red/20 border border-brand-red/40 text-brand-red text-xs font-mono font-bold shadow-sm mr-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-brand-red animate-pulse"></span>
+                        <span>{playbackProgress}%</span>
+                    </div>
+                )}
                 <div className="w-6 flex justify-center">
                     {isSyncing && !isSynced ? (
                          <i className="fas fa-spinner fa-spin text-brand-red text-xs"></i>
@@ -90,7 +98,8 @@ export const OfflineList: React.FC<OfflineListProps> = ({
     currentTrackId,
     isSyncing,
     onStartSync,
-    syncingTrackProgress
+    syncingTrackProgress,
+    playbackProgress
 }) => {
   
   const unsyncedCount = offlinePlaylist.filter(item => !syncedOfflineIds.includes(item.id.videoId)).length;
@@ -167,6 +176,7 @@ export const OfflineList: React.FC<OfflineListProps> = ({
                     isSynced={syncedOfflineIds.includes(item.id.videoId)}
                     isSyncing={isSyncing}
                     offlinePlaylist={offlinePlaylist}
+                    playbackProgress={currentTrackId === item.id.videoId ? playbackProgress : undefined}
                 />
             ))}
         </div>

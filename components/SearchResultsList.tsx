@@ -9,10 +9,11 @@ interface SearchResultListProps {
   onOpenAddToPlaylistModal: (track: VideoItem) => void;
   onSelectChannel: (channelId: string, channelTitle: string) => void;
   viewType: 'search' | 'recommendations';
-  onGenerateDiscoveryMix: () => void;
+  onGenerateDiscoveryMix?: () => void;
   offlineItems: VideoItem[];
   onAddToOffline: (track: VideoItem) => void;
   currentTrackId?: string | null;
+  playbackProgress?: number;
 }
 
 const SearchResultItem: React.FC<{
@@ -24,7 +25,8 @@ const SearchResultItem: React.FC<{
     onAddToOffline: (track: VideoItem) => void;
     isPlaying: boolean;
     contextList: VideoItem[];
-}> = ({ item, onSelectTrack, onOpenAddToPlaylistModal, onSelectChannel, isOffline, onAddToOffline, isPlaying, contextList }) => (
+    playbackProgress?: number;
+}> = ({ item, onSelectTrack, onOpenAddToPlaylistModal, onSelectChannel, isOffline, onAddToOffline, isPlaying, contextList, playbackProgress }) => (
     <div className={`grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group ${isPlaying ? 'bg-dark-highlight/50' : ''}`}>
         <div className="relative w-12 h-12">
             <img
@@ -62,30 +64,28 @@ const SearchResultItem: React.FC<{
                 {item.snippet.channelTitle}
             </p>
         </div>
-        <div className="flex items-center space-x-1 flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-            <button
-                onClick={() => onAddToOffline(item)}
-                disabled={isOffline}
-                className={`p-2 w-10 rounded-full transition-colors duration-200 ${
-                    isOffline ? 'text-green-500' : 'text-dark-subtext hover:text-white'
-                }`}
-                title={isOffline ? "Disimpan offline" : "Simpan untuk offline"}
-            >
-                <i className={`fas ${isOffline ? 'fa-check-circle' : 'fa-cloud-download-alt'}`}></i>
-            </button>
-            <button
-                onClick={() => onOpenAddToPlaylistModal(item)}
-                className="p-2 w-10 rounded-full text-dark-subtext hover:text-white transition-colors duration-200"
-                title="Tambahkan ke playlist"
-            >
-                <i className="fas fa-plus"></i>
-            </button>
+        <div className="flex items-center space-x-1 flex-shrink-0">
+            {isPlaying && typeof playbackProgress === 'number' && (
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-red/20 border border-brand-red/40 text-brand-red text-xs font-mono font-bold shadow-sm mr-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand-red animate-pulse"></span>
+                    <span>{playbackProgress}%</span>
+                </div>
+            )}
+            <div className="flex items-center space-x-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                <button
+                    onClick={() => onOpenAddToPlaylistModal(item)}
+                    className="p-2 w-10 rounded-full text-dark-subtext hover:text-white transition-colors duration-200"
+                    title="Tambahkan ke playlist"
+                >
+                    <i className="fas fa-plus"></i>
+                </button>
+            </div>
         </div>
     </div>
 );
 
 
-export const SearchResultList: React.FC<SearchResultListProps> = ({ results, isLoading, onSelectTrack, onOpenAddToPlaylistModal, onSelectChannel, viewType, onGenerateDiscoveryMix, offlineItems, onAddToOffline, currentTrackId }) => {
+export const SearchResultList: React.FC<SearchResultListProps> = ({ results, isLoading, onSelectTrack, onOpenAddToPlaylistModal, onSelectChannel, viewType, offlineItems, onAddToOffline, currentTrackId, playbackProgress }) => {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -94,23 +94,9 @@ export const SearchResultList: React.FC<SearchResultListProps> = ({ results, isL
     );
   }
 
-  const discoveryMixButton = (
-    <div className="mb-6">
-        <button 
-            onClick={onGenerateDiscoveryMix}
-            disabled={isLoading}
-            className="px-6 py-3 bg-brand-red text-white font-semibold rounded-full hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-brand-red/50 transition-all duration-200 ease-in-out shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-lg"
-        >
-            <i className="fas fa-magic mr-2"></i>
-            Buat Campuran Penemuan Saya
-        </button>
-    </div>
-  );
-  
   if (results.length === 0 && !isLoading) {
     return (
         <div className="text-center py-10 text-dark-subtext">
-            {viewType === 'recommendations' && discoveryMixButton}
             <i className={`fas ${viewType === 'search' ? 'fa-search' : 'fa-music'} text-4xl mb-4 mt-6`}></i>
             <p>{viewType === 'search' ? 'Tidak ada hasil yang ditemukan.' : 'Rekomendasi pribadi Anda akan muncul di sini.'}</p>
             <p className="text-sm">{viewType === 'search' ? 'Coba kata kunci pencarian yang lain.' : 'Dengarkan beberapa lagu untuk memulai.'}</p>
@@ -120,11 +106,6 @@ export const SearchResultList: React.FC<SearchResultListProps> = ({ results, isL
 
   return (
     <div className="space-y-2">
-      {viewType === 'recommendations' && (
-        <div className="flex justify-start items-center mb-4">
-          {discoveryMixButton}
-        </div>
-      )}
       {results.map(item => (
             <SearchResultItem
                 key={item.id.videoId}
@@ -136,6 +117,7 @@ export const SearchResultList: React.FC<SearchResultListProps> = ({ results, isL
                 onAddToOffline={onAddToOffline}
                 isPlaying={currentTrackId === item.id.videoId}
                 contextList={results}
+                playbackProgress={currentTrackId === item.id.videoId ? playbackProgress : undefined}
             />
         )
       )}

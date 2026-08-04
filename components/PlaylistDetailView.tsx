@@ -16,6 +16,7 @@ interface PlaylistDetailViewProps {
   onDelete: () => void;
   onRename: (newName: string) => void;
   isYouTubePlaylist?: boolean;
+  playbackProgress?: number;
 }
 
 const PlaylistItem: React.FC<{
@@ -29,7 +30,8 @@ const PlaylistItem: React.FC<{
     onAddToOffline: (track: VideoItem) => void;
     playlistTracks: VideoItem[];
     isYouTubePlaylist?: boolean;
-}> = ({ item, index, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, isPlaying, isOffline, onAddToOffline, playlistTracks, isYouTubePlaylist }) => (
+    playbackProgress?: number;
+}> = ({ item, index, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, isPlaying, isOffline, onAddToOffline, playlistTracks, isYouTubePlaylist, playbackProgress }) => (
     <div className={`grid grid-cols-[20px_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group ${isPlaying ? 'bg-dark-highlight/50' : ''}`}>
         <div className="flex items-center justify-center text-dark-subtext">
             {isPlaying ? (
@@ -48,13 +50,13 @@ const PlaylistItem: React.FC<{
                 </>
             )}
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 min-w-0">
              <img
                 src={item.snippet.thumbnails.default.url}
                 alt={item.snippet.title}
-                className="w-10 h-10 rounded-md object-cover"
+                className="w-10 h-10 rounded-md object-cover flex-shrink-0"
             />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
                 <p className={`text-sm font-semibold cursor-pointer ${isPlaying ? 'text-brand-red' : 'text-white'} [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden`} onClick={() => onSelectTrack(item, playlistTracks)}>
                     {item.snippet.title}
                 </p>
@@ -66,22 +68,20 @@ const PlaylistItem: React.FC<{
                 </p>
             </div>
         </div>
-        <div className="flex items-center space-x-1 flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-             <button
-                onClick={() => onAddToOffline(item)}
-                disabled={isOffline}
-                className={`p-2 w-10 rounded-full transition-colors duration-200 ${
-                    isOffline ? 'text-green-500' : 'text-dark-subtext hover:text-white'
-                }`}
-                title={isOffline ? "Disimpan offline" : "Simpan untuk offline"}
-            >
-                <i className={`fas ${isOffline ? 'fa-check-circle' : 'fa-cloud-download-alt'}`}></i>
-            </button>
-            {!isYouTubePlaylist && (
-                <button onClick={() => onRemoveFromPlaylist(item.id.videoId)} className="p-2 w-10 rounded-full text-dark-subtext hover:text-white" title="Hapus dari playlist">
-                    <i className="fas fa-trash-alt"></i>
-                </button>
+        <div className="flex items-center space-x-1 flex-shrink-0">
+            {isPlaying && typeof playbackProgress === 'number' && (
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-red/20 border border-brand-red/40 text-brand-red text-xs font-mono font-bold shadow-sm mr-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand-red animate-pulse"></span>
+                    <span>{playbackProgress}%</span>
+                </div>
             )}
+            <div className="flex items-center space-x-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                {!isYouTubePlaylist && (
+                    <button onClick={() => onRemoveFromPlaylist(item.id.videoId)} className="p-2 w-10 rounded-full text-dark-subtext hover:text-white" title="Hapus dari playlist">
+                        <i className="fas fa-trash-alt"></i>
+                    </button>
+                )}
+            </div>
         </div>
     </div>
 );
@@ -160,7 +160,7 @@ const PlaylistHeader: React.FC<{
 };
 
 
-export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, currentTrackId, isAutoplayEnabled, onToggleAutoplay, offlineItems, onAddToOffline, onBack, onDelete, onRename, isYouTubePlaylist }) => {
+export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, currentTrackId, isAutoplayEnabled, onToggleAutoplay, offlineItems, onAddToOffline, onBack, onDelete, onRename, isYouTubePlaylist, playbackProgress }) => {
   if (!playlist) return null;
 
   if (playlist.tracks.length === 0) {
@@ -216,6 +216,7 @@ export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist
                     onAddToOffline={onAddToOffline}
                     playlistTracks={playlist.tracks}
                     isYouTubePlaylist={isYouTubePlaylist}
+                    playbackProgress={currentTrackId === item.id.videoId ? playbackProgress : undefined}
                 />
             )
           })}

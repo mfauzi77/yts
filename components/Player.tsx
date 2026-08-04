@@ -60,7 +60,7 @@ export const Player: React.FC<PlayerProps> = ({
             
             {/* Mobile View */}
             <div className="md:hidden px-3 py-2 flex items-center justify-between bg-dark-surface/95 backdrop-blur-md shadow-lg border-t border-white/10">
-                <div className="flex items-center space-x-3 min-w-0 flex-1 cursor-pointer" onClick={onToggleNowPlaying}>
+                <div className="flex items-center space-x-3 min-w-0 flex-1">
                     <img 
                         src={track.snippet.thumbnails.default.url} 
                         alt={track.snippet.title} 

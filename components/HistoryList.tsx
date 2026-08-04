@@ -10,6 +10,7 @@ interface HistoryListProps {
   offlineItems: VideoItem[];
   onAddToOffline: (track: VideoItem) => void;
   currentTrackId?: string | null;
+  playbackProgress?: number;
 }
 
 const HistoryItem: React.FC<{
@@ -21,7 +22,8 @@ const HistoryItem: React.FC<{
     onAddToOffline: (track: VideoItem) => void;
     isPlaying: boolean;
     history: VideoItem[];
-}> = ({ item, onSelectTrack, onOpenAddToPlaylistModal, onSelectChannel, isOffline, onAddToOffline, isPlaying, history }) => (
+    playbackProgress?: number;
+}> = ({ item, onSelectTrack, onOpenAddToPlaylistModal, onSelectChannel, isOffline, onAddToOffline, isPlaying, history, playbackProgress }) => (
     <div className={`grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group ${isPlaying ? 'bg-dark-highlight/50' : ''}`}>
         <div className="relative w-12 h-12">
             <img
@@ -57,29 +59,27 @@ const HistoryItem: React.FC<{
                 {item.snippet.channelTitle}
             </p>
         </div>
-        <div className="flex items-center space-x-1 flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-            <button
-                onClick={() => onAddToOffline(item)}
-                disabled={isOffline}
-                className={`p-2 w-10 rounded-full transition-colors duration-200 ${
-                    isOffline ? 'text-green-500' : 'text-dark-subtext hover:text-white'
-                }`}
-                title={isOffline ? "Disimpan offline" : "Simpan untuk offline"}
-            >
-                <i className={`fas ${isOffline ? 'fa-check-circle' : 'fa-cloud-download-alt'}`}></i>
-            </button>
-            <button
-                onClick={() => onOpenAddToPlaylistModal(item)}
-                className={`p-2 w-10 rounded-full text-dark-subtext hover:text-white transition-colors duration-200`}
-                title="Tambahkan ke playlist"
-            >
-                <i className={`fas fa-plus`}></i>
-            </button>
+        <div className="flex items-center space-x-1 flex-shrink-0">
+            {isPlaying && typeof playbackProgress === 'number' && (
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-red/20 border border-brand-red/40 text-brand-red text-xs font-mono font-bold shadow-sm mr-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand-red animate-pulse"></span>
+                    <span>{playbackProgress}%</span>
+                </div>
+            )}
+            <div className="flex items-center space-x-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                <button
+                    onClick={() => onOpenAddToPlaylistModal(item)}
+                    className={`p-2 w-10 rounded-full text-dark-subtext hover:text-white transition-colors duration-200`}
+                    title="Tambahkan ke playlist"
+                >
+                    <i className={`fas fa-plus`}></i>
+                </button>
+            </div>
         </div>
     </div>
 );
 
-export const HistoryList: React.FC<HistoryListProps> = ({ history, onSelectTrack, onOpenAddToPlaylistModal, onSelectChannel, offlineItems, onAddToOffline, currentTrackId }) => {
+export const HistoryList: React.FC<HistoryListProps> = ({ history, onSelectTrack, onOpenAddToPlaylistModal, onSelectChannel, offlineItems, onAddToOffline, currentTrackId, playbackProgress }) => {
   if (history.length === 0) {
     return (
       <div className="text-center py-10 text-dark-subtext">
@@ -105,6 +105,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({ history, onSelectTrack
                 isOffline={isOffline}
                 onAddToOffline={onAddToOffline}
                 history={history}
+                playbackProgress={currentTrackId === item.id.videoId ? playbackProgress : undefined}
             />
         );
       })}

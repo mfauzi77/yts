@@ -17,6 +17,7 @@ interface ChannelViewProps {
   currentTrackId?: string | null;
   onLoadMore: () => void;
   hasNextPage: boolean;
+  playbackProgress?: number;
 }
 
 const ChannelVideoItem: React.FC<{
@@ -27,7 +28,8 @@ const ChannelVideoItem: React.FC<{
     onAddToOffline: (track: VideoItem) => void;
     isPlaying: boolean;
     videoList: VideoItem[];
-}> = ({ item, onSelectTrack, onOpenAddToPlaylistModal, isOffline, onAddToOffline, isPlaying, videoList }) => (
+    playbackProgress?: number;
+}> = ({ item, onSelectTrack, onOpenAddToPlaylistModal, isOffline, onAddToOffline, isPlaying, videoList, playbackProgress }) => (
     <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
         <div className="relative w-12 h-12">
             <img
@@ -51,24 +53,22 @@ const ChannelVideoItem: React.FC<{
                 {new Date(item.snippet.publishedAt).toLocaleDateString()}
             </p>
         </div>
-        <div className="flex items-center space-x-1 flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-            <button
-                onClick={() => onAddToOffline(item)}
-                disabled={isOffline}
-                className={`p-2 w-10 rounded-full transition-colors duration-200 ${
-                    isOffline ? 'text-green-500' : 'text-dark-subtext hover:text-white'
-                }`}
-                title={isOffline ? "Disimpan offline" : "Simpan untuk offline"}
-            >
-                <i className={`fas ${isOffline ? 'fa-check-circle' : 'fa-cloud-download-alt'}`}></i>
-            </button>
-            <button
-                onClick={() => onOpenAddToPlaylistModal(item)}
-                className="p-2 w-10 rounded-full text-dark-subtext hover:text-white transition-colors duration-200"
-                title="Tambahkan ke playlist"
-            >
-                <i className="fas fa-plus"></i>
-            </button>
+        <div className="flex items-center space-x-1 flex-shrink-0">
+            {isPlaying && typeof playbackProgress === 'number' && (
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-red/20 border border-brand-red/40 text-brand-red text-xs font-mono font-bold shadow-sm mr-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand-red animate-pulse"></span>
+                    <span>{playbackProgress}%</span>
+                </div>
+            )}
+            <div className="flex items-center space-x-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                <button
+                    onClick={() => onOpenAddToPlaylistModal(item)}
+                    className="p-2 w-10 rounded-full text-dark-subtext hover:text-white transition-colors duration-200"
+                    title="Tambahkan ke playlist"
+                >
+                    <i className="fas fa-plus"></i>
+                </button>
+            </div>
         </div>
     </div>
 );
@@ -120,6 +120,7 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
     currentTrackId,
     onLoadMore,
     hasNextPage,
+    playbackProgress,
 }) => {
     const [activeTab, setActiveTab] = useState<'videos' | 'playlists'>('videos');
 
@@ -167,6 +168,7 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                     onAddToOffline={onAddToOffline}
                                     isPlaying={currentTrackId === item.id.videoId}
                                     videoList={videos}
+                                    playbackProgress={currentTrackId === item.id.videoId ? playbackProgress : undefined}
                                />
                            ))}
                            
