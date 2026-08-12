@@ -9,7 +9,8 @@ interface VideoFeedProps {
   offlineItems: VideoItem[];
   onAddToOffline: (track: VideoItem) => void;
   currentTrackId?: string | null;
-  playbackProgress?: number;
+  playbackProgress?: number | string;
+  playbackTime?: string;
 }
 
 const MusicCard: React.FC<{
@@ -20,8 +21,9 @@ const MusicCard: React.FC<{
     isOffline: boolean;
     onAddToOffline: () => void;
     isPlaying: boolean;
-    playbackProgress?: number;
-}> = ({ item, onSelectTrack, onOpenAddToPlaylistModal, onSelectChannel, isOffline, onAddToOffline, isPlaying, playbackProgress }) => (
+    playbackProgress?: number | string;
+    playbackTime?: string;
+}> = ({ item, onSelectTrack, onOpenAddToPlaylistModal, onSelectChannel, isOffline, onAddToOffline, isPlaying, playbackProgress, playbackTime }) => (
     <div className="group relative bg-dark-card rounded-lg overflow-hidden hover:bg-dark-surface transition-all duration-300 hover:shadow-xl">
         <div className="aspect-square relative cursor-pointer" onClick={onSelectTrack}>
             <img
@@ -30,10 +32,10 @@ const MusicCard: React.FC<{
                 className="w-full h-full object-cover"
             />
             <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors"></div>
-            {isPlaying && typeof playbackProgress === 'number' && (
+            {isPlaying && (playbackTime || playbackProgress !== undefined) && (
                 <div className="absolute top-2 left-2 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-red text-white text-xs font-mono font-bold shadow-md">
                     <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
-                    <span>{playbackProgress}%</span>
+                    <span>{playbackTime || (typeof playbackProgress === 'number' ? `${playbackProgress}%` : playbackProgress)}</span>
                 </div>
             )}
             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -139,6 +141,7 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
                         isOffline={offlineItems.some(o => o.id.videoId === item.id.videoId)}
                         onAddToOffline={() => onAddToOffline(item)}
                         isPlaying={currentTrackId === item.id.videoId}
+                        playbackTime={currentTrackId === item.id.videoId ? (typeof playbackProgress === 'string' ? playbackProgress : undefined) : undefined}
                         playbackProgress={currentTrackId === item.id.videoId ? playbackProgress : undefined}
                     />
                 ))}

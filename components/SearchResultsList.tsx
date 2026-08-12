@@ -13,7 +13,7 @@ interface SearchResultListProps {
   offlineItems: VideoItem[];
   onAddToOffline: (track: VideoItem) => void;
   currentTrackId?: string | null;
-  playbackProgress?: number;
+  playbackProgress?: number | string;
 }
 
 const SearchResultItem: React.FC<{
@@ -25,7 +25,7 @@ const SearchResultItem: React.FC<{
     onAddToOffline: (track: VideoItem) => void;
     isPlaying: boolean;
     contextList: VideoItem[];
-    playbackProgress?: number;
+    playbackProgress?: number | string;
 }> = ({ item, onSelectTrack, onOpenAddToPlaylistModal, onSelectChannel, isOffline, onAddToOffline, isPlaying, contextList, playbackProgress }) => (
     <div className={`grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group ${isPlaying ? 'bg-dark-highlight/50' : ''}`}>
         <div className="relative w-12 h-12">
@@ -65,10 +65,10 @@ const SearchResultItem: React.FC<{
             </p>
         </div>
         <div className="flex items-center space-x-1 flex-shrink-0">
-            {isPlaying && typeof playbackProgress === 'number' && (
+            {isPlaying && playbackProgress !== undefined && (
                 <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-red/20 border border-brand-red/40 text-brand-red text-xs font-mono font-bold shadow-sm mr-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-brand-red animate-pulse"></span>
-                    <span>{playbackProgress}%</span>
+                    <span>{typeof playbackProgress === 'number' ? `${playbackProgress}%` : playbackProgress}</span>
                 </div>
             )}
             <div className="flex items-center space-x-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">

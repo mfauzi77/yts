@@ -12,7 +12,7 @@ interface OfflineListProps {
   isSyncing: boolean;
   onStartSync: () => void;
   syncingTrackProgress: number;
-  playbackProgress?: number;
+  playbackProgress?: number | string;
 }
 
 const OfflineItem: React.FC<{
@@ -25,7 +25,7 @@ const OfflineItem: React.FC<{
     isSynced: boolean;
     isSyncing: boolean;
     offlinePlaylist: VideoItem[];
-    playbackProgress?: number;
+    playbackProgress?: number | string;
 }> = ({ item, index, onSelectTrack, onRemoveFromOfflinePlaylist, onSelectChannel, isPlaying, isSynced, isSyncing, offlinePlaylist, playbackProgress }) => {
     
     return (
@@ -62,10 +62,10 @@ const OfflineItem: React.FC<{
                 </div>
             </div>
             <div className="flex items-center space-x-3 flex-shrink-0">
-                {isPlaying && typeof playbackProgress === 'number' && (
+                {isPlaying && playbackProgress !== undefined && (
                     <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-red/20 border border-brand-red/40 text-brand-red text-xs font-mono font-bold shadow-sm mr-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-brand-red animate-pulse"></span>
-                        <span>{playbackProgress}%</span>
+                        <span>{typeof playbackProgress === 'number' ? `${playbackProgress}%` : playbackProgress}</span>
                     </div>
                 )}
                 <div className="w-6 flex justify-center">

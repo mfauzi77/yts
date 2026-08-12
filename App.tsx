@@ -455,9 +455,16 @@ const App: React.FC = () => {
         }
     }, [activeVolume, sleepTimerEndTime]);
 
-    const activePlaybackProgress = (activeDuration > 0 && !isNaN(activeCurrentTime) && !isNaN(activeDuration)) 
-        ? Math.min(Math.max(Math.round((activeCurrentTime / activeDuration) * 100), 0), 100) 
-        : 0;
+    const formatRealtimeTime = (seconds: number) => {
+        if (isNaN(seconds) || seconds < 0) return '00:00';
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    };
+
+    const activePlaybackTime = activeDuration > 0
+        ? `${formatRealtimeTime(activeCurrentTime)} / ${formatRealtimeTime(activeDuration)}`
+        : formatRealtimeTime(activeCurrentTime);
 
     // Store latest state & callbacks in refs to prevent MediaSession action handlers from re-registering on every tick
     const playRef = useRef(play);
@@ -722,7 +729,7 @@ const App: React.FC = () => {
                     offlineItems={offlineItems}
                     onAddToOffline={handleAddToOffline}
                     currentTrackId={currentTrack?.id.videoId}
-                    playbackProgress={activePlaybackProgress}
+                    playbackProgress={activePlaybackTime}
                     getDownloadState={getDownloadState}
                     onDownloadTrack={handleDownloadTrack}
                     onDeleteDownload={deleteOfflineTrack}
@@ -745,7 +752,7 @@ const App: React.FC = () => {
                     }}
                     onSelectChannel={handleSelectChannel}
                     currentTrackId={currentTrack?.id.videoId}
-                    playbackProgress={activePlaybackProgress}
+                    playbackProgress={activePlaybackTime}
                     isAutoplayEnabled={isAutoplayEnabled}
                     onToggleAutoplay={() => setIsAutoplayEnabled(p => !p)}
                     isShuffle={isShuffle}
@@ -771,7 +778,7 @@ const App: React.FC = () => {
                     offlineItems={offlineItems}
                     onAddToOffline={handleAddToOffline}
                     currentTrackId={currentTrack?.id.videoId}
-                    playbackProgress={activePlaybackProgress}
+                    playbackProgress={activePlaybackTime}
                     getDownloadState={getDownloadState}
                     onDownloadTrack={handleDownloadTrack}
                     onDeleteDownload={deleteOfflineTrack}
@@ -792,7 +799,7 @@ const App: React.FC = () => {
                     onAddToOffline={handleAddToOffline}
                     offlineItems={offlineItems}
                     currentTrackId={currentTrack?.id.videoId}
-                    playbackProgress={activePlaybackProgress}
+                    playbackProgress={activePlaybackTime}
                     onLoadMore={() => {}}
                     hasNextPage={!!channelNextPageToken}
                     getDownloadState={getDownloadState}
@@ -811,7 +818,7 @@ const App: React.FC = () => {
                     onRemoveFromPlaylist={() => {}} // Cannot remove from YouTube playlist
                     onSelectChannel={handleSelectChannel}
                     currentTrackId={currentTrack?.id.videoId}
-                    playbackProgress={activePlaybackProgress}
+                    playbackProgress={activePlaybackTime}
                     isAutoplayEnabled={isAutoplayEnabled}
                     onToggleAutoplay={() => setIsAutoplayEnabled(p => !p)}
                     isShuffle={isShuffle}
