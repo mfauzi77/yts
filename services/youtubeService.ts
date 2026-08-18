@@ -134,13 +134,22 @@ export const getRelatedVideos = async (videoId: string, fallbackTitle?: string):
 };
 
 
+const channelUploadsCache = new Map<string, string>();
+
 const getChannelUploadsPlaylistId = async (channelId: string): Promise<string | null> => {
+    if (channelUploadsCache.has(channelId)) {
+        return channelUploadsCache.get(channelId)!;
+    }
     const params = new URLSearchParams({
         part: 'contentDetails',
         id: channelId,
     });
     const data = await fetchFromApiCore('/channels', params);
-    return data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads || null;
+    const uploadsId = data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads || null;
+    if (uploadsId) {
+        channelUploadsCache.set(channelId, uploadsId);
+    }
+    return uploadsId;
 };
 
 export const getPlaylistItems = async (playlistId: string, maxResults = 50, pageToken?: string): Promise<ApiResponse> => {
@@ -217,3 +226,40 @@ export const getChannelVideos = async (channelId: string, _order: 'date' | 'view
     
     return getPlaylistItems(uploadsPlaylistId, maxResults, pageToken);
 };
+
+export const getSearchSuggestions = async (query: string): Promise<string[]> => {
+    if (typeof query !== 'string' || !query.trim()) {
+        return [];
+    }
+
+    const trimmed = query.trim();
+
+    try {
+        const response = await fetch(`/api/suggestions?q=${encodeURIComponent(trimmed)}`);
+        if (response.ok) {
+            const data = await response.json();
+            if (Array.isArray(data)) {
+                return data;
+            }
+        }
+    } catch (err) {
+        console.warn("Proxy suggestion request failed, fallbacking...", err);
+    }
+
+    // Direct client fallback
+    try {
+        const url = `https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&q=${encodeURIComponent(trimmed)}`;
+        const directRes = await fetch(url);
+        if (directRes.ok) {
+            const data = await directRes.json();
+            if (Array.isArray(data?.[1])) {
+                return data[1];
+            }
+        }
+    } catch (err) {
+        console.warn("Direct suggestion fetch failed:", err);
+    }
+
+    return [];
+};
+

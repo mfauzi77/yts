@@ -52,6 +52,7 @@ const App: React.FC = () => {
     const [channelVideos, setChannelVideos] = useState<VideoItem[]>([]);
     const [channelPlaylists, setChannelPlaylists] = useState<YouTubePlaylist[]>([]);
     const [isChannelLoading, setIsChannelLoading] = useState<boolean>(false);
+    const [isChannelMoreLoading, setIsChannelMoreLoading] = useState<boolean>(false);
     const [channelNextPageToken, setChannelNextPageToken] = useState<string | undefined>(undefined);
     
     const [selectedYouTubePlaylist, setSelectedYouTubePlaylist] = useState<YouTubePlaylist | null>(null);
@@ -672,6 +673,8 @@ const App: React.FC = () => {
         setActiveView('channel');
         setChannelVideos([]);
         setChannelPlaylists([]);
+        setChannelNextPageToken(undefined);
+        setIsChannelMoreLoading(false);
         try {
             const [videoData, playlistData] = await Promise.all([
                 getChannelVideos(channelId),
@@ -684,6 +687,20 @@ const App: React.FC = () => {
         } catch (err) { handleApiError(err); } 
         finally { setIsChannelLoading(false); }
     }, []);
+
+    const handleLoadMoreChannelVideos = useCallback(async () => {
+        if (!selectedChannel || !channelNextPageToken || isChannelMoreLoading) return;
+        setIsChannelMoreLoading(true);
+        try {
+            const videoData = await getChannelVideos(selectedChannel.id, 'date', 50, channelNextPageToken);
+            setChannelVideos(prev => [...prev, ...videoData.items]);
+            setChannelNextPageToken(videoData.nextPageToken);
+        } catch (err) {
+            handleApiError(err);
+        } finally {
+            setIsChannelMoreLoading(false);
+        }
+    }, [selectedChannel, channelNextPageToken, isChannelMoreLoading]);
 
     const handleSelectYouTubePlaylist = useCallback(async (playlist: YouTubePlaylist) => {
         setIsYoutubePlaylistLoading(true);
@@ -791,7 +808,7 @@ const App: React.FC = () => {
                     videos={channelVideos}
                     playlists={channelPlaylists}
                     isLoading={isChannelLoading}
-                    isMoreLoading={false}
+                    isMoreLoading={isChannelMoreLoading}
                     onSelectTrack={handleSelectTrack}
                     onSelectPlaylist={handleSelectYouTubePlaylist}
                     onBack={() => setActiveView('home')}
@@ -800,7 +817,7 @@ const App: React.FC = () => {
                     offlineItems={offlineItems}
                     currentTrackId={currentTrack?.id.videoId}
                     playbackProgress={activePlaybackTime}
-                    onLoadMore={() => {}}
+                    onLoadMore={handleLoadMoreChannelVideos}
                     hasNextPage={!!channelNextPageToken}
                     getDownloadState={getDownloadState}
                     onDownloadTrack={handleDownloadTrack}
@@ -947,7 +964,7 @@ const App: React.FC = () => {
                     <header className="flex-shrink-0 z-10 p-2 md:p-4">
                         <div className="container mx-auto flex items-center justify-between">
                             <div className="flex-1 max-w-lg">
-                                <SearchBar onSearch={handleSearch} />
+                                <SearchBar onSearch={handleSearch} searchHistory={searchHistory} />
                             </div>
                             <div className="flex items-center space-x-4">
                                <ApiStatusIndicator status={apiStatus} />

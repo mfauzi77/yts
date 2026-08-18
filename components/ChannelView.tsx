@@ -172,20 +172,53 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                />
                            ))}
                            
+                           {isMoreLoading && (
+                               <div className="space-y-2 mt-2">
+                                   {[1, 2, 3].map((skeletonIndex) => (
+                                       <div 
+                                           key={`channel-skeleton-${skeletonIndex}`} 
+                                           className="grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 rounded-md bg-dark-card/40 animate-pulse border border-white/5"
+                                       >
+                                           <div className="w-12 h-12 rounded bg-dark-surface/80" />
+                                           <div className="space-y-2 py-1">
+                                               <div className="h-3.5 bg-dark-surface/90 rounded w-3/4" />
+                                               <div className="h-2.5 bg-dark-surface/50 rounded w-1/3" />
+                                           </div>
+                                           <div className="w-6 h-6 rounded-full bg-dark-surface/50" />
+                                       </div>
+                                   ))}
+                               </div>
+                           )}
+
                            {hasNextPage && (
                                <div className="flex justify-center py-6">
                                    <button
                                        onClick={onLoadMore}
                                        disabled={isMoreLoading}
-                                       className="px-6 py-2 bg-dark-card text-white font-semibold rounded-full hover:bg-dark-surface focus:outline-none focus:ring-2 focus:ring-brand-red/50 transition-colors disabled:opacity-50 disabled:cursor-wait"
+                                       className={`flex items-center justify-center gap-2.5 px-6 py-2.5 rounded-full font-semibold text-sm transition-all duration-300 shadow-md ${
+                                           isMoreLoading
+                                               ? 'bg-dark-surface border border-brand-red/40 text-brand-red cursor-wait'
+                                               : 'bg-dark-card hover:bg-dark-surface hover:border-dark-highlight border border-transparent text-white active:scale-95'
+                                       }`}
                                    >
                                        {isMoreLoading ? (
                                            <>
-                                               <i className="fas fa-spinner fa-spin mr-2"></i>
-                                               Memuat...
+                                               <svg className="animate-spin h-4 w-4 text-brand-red" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                               </svg>
+                                               <span>Memuat video...</span>
+                                               <span className="flex space-x-1 items-center ml-1">
+                                                   <span className="w-1.5 h-1.5 bg-brand-red rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                                   <span className="w-1.5 h-1.5 bg-brand-red rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                                   <span className="w-1.5 h-1.5 bg-brand-red rounded-full animate-bounce"></span>
+                                               </span>
                                            </>
                                        ) : (
-                                           'Muat Lebih Banyak'
+                                           <>
+                                               <i className="fas fa-arrow-down text-xs opacity-70"></i>
+                                               <span>Muat Lebih Banyak</span>
+                                           </>
                                        )}
                                    </button>
                                </div>

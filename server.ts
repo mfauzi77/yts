@@ -22,6 +22,31 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+// YouTube Suggestions endpoint
+app.get("/api/suggestions", async (req, res) => {
+  const query = req.query.q as string;
+  if (!query || !query.trim()) {
+    return res.json([]);
+  }
+  try {
+    const url = `https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&q=${encodeURIComponent(query.trim())}`;
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+    if (!response.ok) {
+      return res.json([]);
+    }
+    const data = await response.json();
+    const suggestions: string[] = Array.isArray(data?.[1]) ? data[1] : [];
+    res.json(suggestions);
+  } catch (error) {
+    console.error("Error fetching suggestions:", error);
+    res.json([]);
+  }
+});
+
 // Use app.use for more flexible path matching
 app.use("/api/youtube", async (req, res) => {
   console.log(`YouTube Proxy Request: ${req.method} ${req.originalUrl}`);
