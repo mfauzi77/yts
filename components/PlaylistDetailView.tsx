@@ -1,6 +1,15 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import type { VideoItem, Playlist } from '../types';
+import {
+  ChevronLeft,
+  Play,
+  Shuffle,
+  Trash2,
+  Edit2,
+  Share2,
+  ListMusic,
+} from 'lucide-react';
+import { TrackCard } from './TrackCard';
 
 interface PlaylistDetailViewProps {
   playlist: Playlist;
@@ -8,6 +17,7 @@ interface PlaylistDetailViewProps {
   onRemoveFromPlaylist: (trackId: string) => void;
   onSelectChannel: (channelId: string, channelTitle: string) => void;
   currentTrackId?: string | null;
+  isPlaying?: boolean;
   isAutoplayEnabled: boolean;
   onToggleAutoplay: () => void;
   offlineItems: VideoItem[];
@@ -17,210 +27,257 @@ interface PlaylistDetailViewProps {
   onRename: (newName: string) => void;
   isYouTubePlaylist?: boolean;
   playbackProgress?: number | string;
+  onToggleLike?: (track: VideoItem) => void;
+  likedTrackIds?: string[];
+  onShare?: () => void;
 }
 
-const PlaylistItem: React.FC<{
-    item: VideoItem;
-    index: number;
-    onSelectTrack: (track: VideoItem, contextList: VideoItem[]) => void;
-    onRemoveFromPlaylist: (trackId: string) => void;
-    onSelectChannel: (channelId: string, channelTitle: string) => void;
-    isPlaying: boolean;
-    isOffline: boolean;
-    onAddToOffline: (track: VideoItem) => void;
-    playlistTracks: VideoItem[];
-    isYouTubePlaylist?: boolean;
-    playbackProgress?: number | string;
-}> = ({ item, index, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, isPlaying, isOffline, onAddToOffline, playlistTracks, isYouTubePlaylist, playbackProgress }) => (
-    <div className={`grid grid-cols-[20px_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group ${isPlaying ? 'bg-dark-highlight/50' : ''}`}>
-        <div className="flex items-center justify-center text-dark-subtext">
-            {isPlaying ? (
-                <div className="flex items-center justify-center">
-                    <span className="relative flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-                    </span>
-                </div>
-            ) : (
-                <>
-                    <span className="group-hover:hidden">{index + 1}</span>
-                    <button onClick={() => onSelectTrack(item, playlistTracks)} className="hidden group-hover:block" aria-label={`Putar ${item.snippet.title}`}>
-                        <i className="fas fa-play text-white"></i>
-                    </button>
-                </>
-            )}
-        </div>
-        <div className="flex items-center gap-4 min-w-0">
-             <img
-                src={item.snippet.thumbnails.default.url}
-                alt={item.snippet.title}
-                className="w-10 h-10 rounded-md object-cover flex-shrink-0"
-            />
-            <div className="min-w-0 flex-1">
-                <p className={`text-sm font-semibold cursor-pointer ${isPlaying ? 'text-brand-red' : 'text-white'} [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden`} onClick={() => onSelectTrack(item, playlistTracks)}>
-                    {item.snippet.title}
-                </p>
-                <p 
-                    className="text-xs text-dark-subtext cursor-pointer hover:underline"
-                    onClick={() => onSelectChannel(item.snippet.channelId, item.snippet.channelTitle)}
-                >
-                    {item.snippet.channelTitle}
-                </p>
-            </div>
-        </div>
-        <div className="flex items-center space-x-1 flex-shrink-0">
-            {isPlaying && playbackProgress !== undefined && (
-                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-red/20 border border-brand-red/40 text-brand-red text-xs font-mono font-bold shadow-sm mr-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-brand-red animate-pulse"></span>
-                    <span>{typeof playbackProgress === 'number' ? `${playbackProgress}%` : playbackProgress}</span>
-                </div>
-            )}
-            <div className="flex items-center space-x-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                {!isYouTubePlaylist && (
-                    <button onClick={() => onRemoveFromPlaylist(item.id.videoId)} className="p-2 w-10 rounded-full text-dark-subtext hover:text-white" title="Hapus dari playlist">
-                        <i className="fas fa-trash-alt"></i>
-                    </button>
-                )}
-            </div>
-        </div>
-    </div>
-);
+export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({
+  playlist,
+  onSelectTrack,
+  onRemoveFromPlaylist,
+  onSelectChannel,
+  currentTrackId,
+  isPlaying = false,
+  offlineItems,
+  onAddToOffline,
+  onBack,
+  onDelete,
+  onRename,
+  isYouTubePlaylist = false,
+  onToggleLike,
+  likedTrackIds = [],
+  onShare,
+}) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [title, setTitle] = useState(playlist?.name || '');
+  const inputRef = useRef<HTMLInputElement>(null);
 
-const PlaylistHeader: React.FC<{
-    playlist: Playlist;
-    onBack: () => void;
-    onDelete: () => void;
-    onRename: (newName: string) => void;
-    isYouTubePlaylist?: boolean;
-}> = ({ playlist, onBack, onDelete, onRename, isYouTubePlaylist }) => {
-    const [isEditing, setIsEditing] = useState(false);
-    const [title, setTitle] = useState(playlist.name);
-    const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (playlist?.name) {
+      setTitle(playlist.name);
+    }
+  }, [playlist?.name]);
 
-    useEffect(() => {
-        setTitle(playlist.name);
-    }, [playlist.name]);
+  useEffect(() => {
+    if (isEditing) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [isEditing]);
 
-    useEffect(() => {
-        if (isEditing) {
-            inputRef.current?.focus();
-            inputRef.current?.select();
-        }
-    }, [isEditing]);
-    
-    const handleRename = () => {
-        if (title.trim() && title.trim() !== playlist.name) {
-            onRename(title.trim());
-        } else {
-            setTitle(playlist.name);
-        }
-        setIsEditing(false);
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter') handleRename();
-        if (e.key === 'Escape') {
-            setTitle(playlist.name);
-            setIsEditing(false);
-        }
-    };
-    
-    return (
-        <div className="flex-shrink-0 pt-6 pb-4 px-2 md:px-0 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-                <button onClick={onBack} className="p-2 mr-2 -ml-2 rounded-full hover:bg-dark-surface">
-                    <i className="fas fa-arrow-left text-white"></i>
-                </button>
-                {isEditing && !isYouTubePlaylist ? (
-                    <input
-                        ref={inputRef}
-                        type="text"
-                        value={title}
-                        onChange={e => setTitle(e.target.value)}
-                        onBlur={handleRename}
-                        onKeyDown={handleKeyDown}
-                        className="text-3xl md:text-4xl font-bold text-white bg-transparent border-b-2 border-brand-red outline-none"
-                    />
-                ) : (
-                    <h1 
-                        className={`text-3xl md:text-4xl font-bold text-white truncate ${!isYouTubePlaylist ? 'cursor-pointer' : ''}`} 
-                        onClick={() => !isYouTubePlaylist && setIsEditing(true)}
-                    >
-                        {playlist.name}
-                    </h1>
-                )}
-            </div>
-            {!isYouTubePlaylist && (
-                <button onClick={onDelete} className="p-2 rounded-full text-dark-subtext hover:text-brand-red hover:bg-dark-surface" title="Hapus playlist">
-                    <i className="fas fa-trash-alt"></i>
-                </button>
-            )}
-        </div>
-    );
-};
-
-
-export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, currentTrackId, isAutoplayEnabled, onToggleAutoplay, offlineItems, onAddToOffline, onBack, onDelete, onRename, isYouTubePlaylist, playbackProgress }) => {
   if (!playlist) return null;
 
-  if (playlist.tracks.length === 0) {
-    return (
-      <>
-        <PlaylistHeader playlist={playlist} onBack={onBack} onDelete={onDelete} onRename={onRename} isYouTubePlaylist={isYouTubePlaylist} />
-        <div className="text-center py-10 text-dark-subtext">
-            <i className="fas fa-list-ul text-4xl mb-4"></i>
-            <p>Playlist ini kosong.</p>
-            {!isYouTubePlaylist && <p className="text-sm">Tambahkan lagu dari hasil pencarian untuk memulai.</p>}
-        </div>
-      </>
-    );
-  }
+  const handleRename = () => {
+    if (title.trim() && title.trim() !== playlist.name) {
+      onRename(title.trim());
+    } else {
+      setTitle(playlist.name);
+    }
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') handleRename();
+    if (e.key === 'Escape') {
+      setTitle(playlist.name);
+      setIsEditing(false);
+    }
+  };
+
+  const handlePlayAll = () => {
+    if (playlist.tracks.length > 0) {
+      onSelectTrack(playlist.tracks[0], playlist.tracks);
+    }
+  };
+
+  const handleShufflePlay = () => {
+    if (playlist.tracks.length > 0) {
+      const shuffled = [...playlist.tracks].sort(() => Math.random() - 0.5);
+      onSelectTrack(shuffled[0], shuffled);
+    }
+  };
 
   return (
-    <div>
-        <PlaylistHeader playlist={playlist} onBack={onBack} onDelete={onDelete} onRename={onRename} isYouTubePlaylist={isYouTubePlaylist} />
-        <div className="flex items-center justify-between mb-4 pr-2">
-            <div className="flex items-center space-x-2">
-                <button 
-                    onClick={() => {
-                        const shuffled = [...playlist.tracks].sort(() => Math.random() - 0.5);
-                        onSelectTrack(shuffled[0], shuffled);
-                    }}
-                    className="flex items-center space-x-2 px-4 py-2 bg-brand-red hover:bg-red-700 text-white rounded-full text-sm font-bold transition-all transform active:scale-95 shadow-lg"
-                >
-                    <i className="fas fa-random"></i>
-                    <span>Acak & Putar</span>
-                </button>
-            </div>
-            <div className="flex items-center">
-                <span className="mr-3 text-sm font-medium text-dark-subtext">Putar Otomatis</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" checked={isAutoplayEnabled} onChange={onToggleAutoplay} className="sr-only peer" />
-                    <div className="w-11 h-6 bg-dark-card peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-brand-red"></div>
-                </label>
-            </div>
+    <div className="space-y-6 pb-12 select-none">
+      {/* Hero Header Banner */}
+      <div className="relative rounded-2xl overflow-hidden bg-gradient-to-b from-[#242424] via-[#181818] to-[#121212] p-6 md:p-8 border border-[#282828] shadow-2xl">
+        {/* Back Button */}
+        <div className="mb-4">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#1c1c1c] hover:bg-[#282828] text-[#9ca3af] hover:text-white text-xs font-semibold transition-colors border border-[#282828]"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            <span>Kembali</span>
+          </button>
         </div>
+
+        {/* Hero Content */}
+        <div className="flex flex-col sm:flex-row items-center sm:items-end gap-4 sm:gap-6">
+          {/* Cover Art / Mosaic */}
+          <div className="w-32 h-32 sm:w-40 sm:h-40 md:w-52 md:h-52 rounded-xl overflow-hidden bg-[#242424] shadow-2xl flex-shrink-0 border border-[#282828]">
+            {playlist.tracks.length > 0 ? (
+              <div className="grid grid-cols-2 grid-rows-2 w-full h-full">
+                {playlist.tracks.slice(0, 4).map((t, i) => (
+                  <img
+                    key={t.id.videoId + i}
+                    src={
+                      t.snippet.thumbnailData ||
+                      t.snippet.thumbnails.medium?.url ||
+                      t.snippet.thumbnails.default.url
+                    }
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-[#6b7280]">
+                <ListMusic className="w-12 h-12 sm:w-16 sm:h-16" />
+              </div>
+            )}
+          </div>
+
+          {/* Details & Actions */}
+          <div className="flex-1 text-center sm:text-left min-w-0 space-y-1.5 sm:space-y-2">
+            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-[#9ca3af]">
+              {isYouTubePlaylist ? 'YouTube Playlist' : 'Playlist'}
+            </span>
+
+            {isEditing && !isYouTubePlaylist ? (
+              <input
+                ref={inputRef}
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onBlur={handleRename}
+                onKeyDown={handleKeyDown}
+                className="w-full text-xl sm:text-2xl md:text-4xl font-black text-white bg-transparent border-b-2 border-emerald-500 outline-none pb-1"
+              />
+            ) : (
+              <div className="flex items-center justify-center sm:justify-start gap-2 group">
+                <h1
+                  className={`text-xl sm:text-2xl md:text-4xl font-black text-white truncate ${
+                    !isYouTubePlaylist ? 'cursor-pointer hover:underline' : ''
+                  }`}
+                  onClick={() => !isYouTubePlaylist && setIsEditing(true)}
+                  title={playlist.name}
+                >
+                  {playlist.name}
+                </h1>
+                {!isYouTubePlaylist && (
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded-full text-[#9ca3af] hover:text-white transition-opacity"
+                    title="Ubah nama playlist"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            <p className="text-xs md:text-sm text-[#9ca3af] font-medium">
+              {playlist.tracks.length} lagu • Dibuat oleh Anda
+            </p>
+
+            {/* Quick Action Buttons */}
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 pt-3">
+              <button
+                onClick={handlePlayAll}
+                disabled={playlist.tracks.length === 0}
+                className="w-12 h-12 rounded-full bg-emerald-500 text-black flex items-center justify-center shadow-xl hover:scale-105 active:scale-95 disabled:opacity-40 transition-all"
+                title="Putar Semua"
+              >
+                <Play className="w-5 h-5 fill-current text-black ml-0.5" />
+              </button>
+
+              <button
+                onClick={handleShufflePlay}
+                disabled={playlist.tracks.length === 0}
+                className="p-3 rounded-full hover:bg-white/10 text-[#9ca3af] hover:text-white transition-colors"
+                title="Acak"
+              >
+                <Shuffle className="w-5 h-5" />
+              </button>
+
+              {onShare && (
+                <button
+                  onClick={onShare}
+                  className="p-3 rounded-full hover:bg-white/10 text-[#9ca3af] hover:text-white transition-colors"
+                  title="Bagikan Playlist"
+                >
+                  <Share2 className="w-5 h-5" />
+                </button>
+              )}
+
+              {!isYouTubePlaylist && (
+                <button
+                  onClick={onDelete}
+                  className="p-3 rounded-full hover:bg-red-500/20 text-[#9ca3af] hover:text-red-400 transition-colors"
+                  title="Hapus Playlist"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Track List Table */}
+      {playlist.tracks.length === 0 ? (
+        <div className="text-center py-16 px-4 bg-[#181818] rounded-xl border border-[#282828]">
+          <ListMusic className="w-12 h-12 text-[#6b7280] mx-auto mb-3" />
+          <h3 className="text-base font-bold text-white mb-1">Playlist Ini Kosong</h3>
+          <p className="text-xs text-[#9ca3af] max-w-xs mx-auto">
+            Cari lagu di Beranda atau Cari dan tambahkan ke sini.
+          </p>
+        </div>
+      ) : (
         <div className="space-y-1">
+          <div className="flex items-center justify-between px-3 py-2 text-xs font-bold text-[#6b7280] uppercase tracking-wider border-b border-[#282828]">
+            <span>Daftar Lagu ({playlist.tracks.length})</span>
+            <span>Aksi</span>
+          </div>
+
           {playlist.tracks.map((item, index) => {
-            const isOffline = offlineItems.some(o => o.id.videoId === item.id.videoId);
+            const isOffline = offlineItems.some((o) => o.id.videoId === item.id.videoId);
+            const isLiked = likedTrackIds.includes(item.id.videoId);
             return (
-                <PlaylistItem 
-                    key={item.id.videoId} 
+              <div key={item.id.videoId + index} className="group relative flex items-center">
+                <div className="flex-1 min-w-0">
+                  <TrackCard
                     item={item}
                     index={index}
-                    onSelectTrack={onSelectTrack}
-                    onRemoveFromPlaylist={onRemoveFromPlaylist}
+                    isCurrent={currentTrackId === item.id.videoId}
+                    isPlaying={isPlaying}
+                    onSelect={(track) => onSelectTrack(track, playlist.tracks)}
                     onSelectChannel={onSelectChannel}
-                    isPlaying={currentTrackId === item.id.videoId}
+                    onToggleLike={onToggleLike}
+                    isLiked={isLiked}
                     isOffline={isOffline}
-                    onAddToOffline={onAddToOffline}
-                    playlistTracks={playlist.tracks}
-                    isYouTubePlaylist={isYouTubePlaylist}
-                    playbackProgress={currentTrackId === item.id.videoId ? playbackProgress : undefined}
-                />
-            )
+                    onDownload={onAddToOffline}
+                    variant="row"
+                  />
+                </div>
+
+                {!isYouTubePlaylist && (
+                  <button
+                    onClick={() => onRemoveFromPlaylist(item.id.videoId)}
+                    className="opacity-0 group-hover:opacity-100 p-2 rounded-full text-[#6b7280] hover:text-red-400 transition-all mr-2 flex-shrink-0"
+                    title="Hapus dari Playlist"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            );
           })}
         </div>
+      )}
     </div>
   );
 };
+

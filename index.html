@@ -1,52 +1,137 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="id" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>YTS - MP3 Player</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#0f0f0f" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>Remix YTS - Modern Music Streaming</title>
+    <meta name="description" content="A minimalist, modern, and legal YouTube music streamer. Search songs, create playlists, and listen with high fidelity sound." />
     <link rel="manifest" href="/manifest.json" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <script>
       tailwind.config = {
         darkMode: 'class',
         theme: {
           extend: {
+            fontFamily: {
+              sans: ['"Inter"', 'system-ui', '-apple-system', 'sans-serif'],
+              mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+            },
             colors: {
-              'brand-red': '#FF0000',
-              'dark-bg': '#0f0f0f',
-              'dark-surface': '#212121',
-              'dark-card': '#272727',
-              'dark-text': '#FFFFFF',
-              'dark-subtext': '#AAAAAA',
-              'dark-highlight': '#3F3F3F',
+              brand: {
+                DEFAULT: '#10b981',
+                hover: '#34d399',
+                active: '#059669',
+                glow: 'rgba(16, 185, 129, 0.25)',
+                muted: 'rgba(16, 185, 129, 0.12)',
+              },
+              app: {
+                bg: '#0f0f0f',
+                nav: '#121212',
+                player: '#121212',
+                card: '#181818',
+                cardHover: '#222222',
+                input: '#1c1c1c',
+                border: '#282828',
+                borderLight: '#333333',
+                activeTrack: '#18271e',
+              }
+            },
+            boxShadow: {
+              'glow': '0 0 20px rgba(16, 185, 129, 0.3)',
+              'glow-lg': '0 0 36px rgba(16, 185, 129, 0.4)',
+              'card': '0 4px 20px -2px rgba(0, 0, 0, 0.5)',
+              'card-hover': '0 12px 28px -4px rgba(0, 0, 0, 0.7)',
             }
           }
         }
       }
     </script>
     <style>
+      :root {
+        --sat: env(safe-area-inset-top, 0px);
+        --sab: env(safe-area-inset-bottom, 0px);
+        --sal: env(safe-area-inset-left, 0px);
+        --sar: env(safe-area-inset-right, 0px);
+      }
+
+      * {
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+      }
+
+      html, body {
+        background-color: #0f0f0f;
+        color: #ffffff;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        overflow-x: hidden;
+        overscroll-behavior-y: none;
+      }
+
       ::-webkit-scrollbar {
         width: 8px;
         height: 8px;
       }
       ::-webkit-scrollbar-track {
-        background: #0f0f0f; 
+        background: transparent; 
       }
       ::-webkit-scrollbar-thumb {
-        background: #3F3F3F; 
-        border-radius: 4px;
+        background: #282828; 
+        border-radius: 9999px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #555; 
-      }
-      
-      body {
-        background-color: #0f0f0f;
-        color: white;
+        background: #383838; 
       }
 
-      /* Player Container: Tetap ada untuk audio tapi tidak terlihat */
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+
+      input[type=range] {
+        -webkit-appearance: none;
+        background: transparent;
+      }
+      input[type=range]:focus {
+        outline: none;
+      }
+      input[type=range]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        height: 12px;
+        width: 12px;
+        border-radius: 50%;
+        background: #ffffff;
+        cursor: pointer;
+        box-shadow: 0 0 6px rgba(0,0,0,0.6);
+        transition: transform 0.15s ease, background-color 0.15s ease;
+      }
+      input[type=range]::-webkit-slider-thumb:hover {
+        transform: scale(1.25);
+        background: #10b981;
+      }
+      input[type=range]::-moz-range-thumb {
+        height: 12px;
+        width: 12px;
+        border-radius: 50%;
+        background: #ffffff;
+        cursor: pointer;
+        border: none;
+        box-shadow: 0 0 6px rgba(0,0,0,0.6);
+        transition: transform 0.15s ease, background-color 0.15s ease;
+      }
+      input[type=range]::-moz-range-thumb:hover {
+        transform: scale(1.25);
+        background: #10b981;
+      }
+
       #player-container {
         position: fixed;
         top: -1000px;
@@ -70,7 +155,7 @@
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
-  <body class="bg-dark-bg antialiased text-dark-text">
+  <body class="bg-[#0f0f0f] antialiased text-white selection:bg-brand selection:text-white">
     <div id="root"></div>
     <div id="player-container"></div>
     <script type="module" src="/index.tsx"></script>

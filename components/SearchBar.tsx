@@ -1,21 +1,35 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Search, X, Clock, ArrowUpRight, Loader2 } from 'lucide-react';
 import { getSearchSuggestions } from '../services/youtubeService';
 
 interface SearchBarProps {
   onSearch: (query: string) => void;
   searchHistory?: string[];
+  isLoading?: boolean;
+  initialQuery?: string;
+  onSelectSuggestion?: (suggestion: string) => void;
 }
 
-export const SearchBar: React.FC<SearchBarProps> = ({ onSearch, searchHistory = [] }) => {
-  const [query, setQuery] = useState('');
+export const SearchBar: React.FC<SearchBarProps> = ({
+  onSearch,
+  searchHistory = [],
+  isLoading: externalLoading = false,
+  initialQuery = '',
+  onSelectSuggestion,
+}) => {
+  const [query, setQuery] = useState(initialQuery);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [isOpen, setIsOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    setQuery(initialQuery);
+  }, [initialQuery]);
 
   // Fetch suggestions when query changes with debouncing
   useEffect(() => {
@@ -26,21 +40,20 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSearch, searchHistory = 
     const trimmed = query.trim();
     if (!trimmed) {
       setSuggestions([]);
-      setIsLoading(false);
+      setIsFetchingSuggestions(false);
       return;
     }
 
-    setIsLoading(true);
+    setIsFetchingSuggestions(true);
     debounceTimerRef.current = setTimeout(async () => {
       try {
         const results = await getSearchSuggestions(trimmed);
         setSuggestions(results);
         setSelectedIndex(-1);
       } catch (err) {
-        console.error('Failed to get search suggestions:', err);
         setSuggestions([]);
       } finally {
-        setIsLoading(false);
+        setIsFetchingSuggestions(false);
       }
     }, 200);
 
@@ -67,12 +80,19 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSearch, searchHistory = 
     };
   }, []);
 
-  const handleSelectSuggestion = useCallback((suggestion: string) => {
-    setQuery(suggestion);
-    setIsOpen(false);
-    setSelectedIndex(-1);
-    onSearch(suggestion);
-  }, [onSearch]);
+  const handleSelectSuggestion = useCallback(
+    (suggestion: string) => {
+      setQuery(suggestion);
+      setIsOpen(false);
+      setSelectedIndex(-1);
+      if (onSelectSuggestion) {
+        onSelectSuggestion(suggestion);
+      } else {
+        onSearch(suggestion);
+      }
+    },
+    [onSearch, onSelectSuggestion]
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,7 +112,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSearch, searchHistory = 
       return;
     }
 
-    const displayList = suggestions.length > 0 ? suggestions : (query.trim() === '' ? searchHistory.slice(0, 5) : []);
+    const displayList =
+      suggestions.length > 0 ? suggestions : query.trim() === '' ? searchHistory.slice(0, 5) : [];
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -116,22 +137,22 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSearch, searchHistory = 
   };
 
   const showHistory = query.trim() === '' && searchHistory.length > 0;
-  const itemsToShow = suggestions.length > 0 ? suggestions : (showHistory ? searchHistory.slice(0, 6) : []);
-  const shouldShowDropdown = isOpen && (itemsToShow.length > 0 || isLoading);
+  const itemsToShow =
+    suggestions.length > 0 ? suggestions : showHistory ? searchHistory.slice(0, 6) : [];
+  const shouldShowDropdown = isOpen && (itemsToShow.length > 0 || isFetchingSuggestions);
+  const isLoading = isFetchingSuggestions || externalLoading;
 
   return (
     <div ref={containerRef} className="relative w-full">
       <form onSubmit={handleSubmit} className="flex w-full relative">
-        <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-dark-subtext">
+        <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-dark-subtext">
           {isLoading ? (
-            <svg className="animate-spin h-4 w-4 text-brand-red" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
+            <Loader2 className="w-4 h-4 text-brand animate-spin" />
           ) : (
-            <i className="fas fa-search"></i>
+            <Search className="w-4 h-4" />
           )}
         </div>
+
         <input
           ref={inputRef}
           type="text"
@@ -142,36 +163,37 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSearch, searchHistory = 
           }}
           onFocus={() => setIsOpen(true)}
           onKeyDown={handleKeyDown}
-          placeholder="Cari lagu, musisi, atau genre..."
+          placeholder="Cari lagu, musisi, atau album..."
           autoComplete="off"
           spellCheck="false"
-          className="w-full pl-10 pr-10 py-2 border border-transparent focus:border-brand-red/40 rounded-full focus:outline-none focus:ring-2 focus:ring-brand-red/70 bg-dark-card text-dark-text placeholder-dark-subtext transition-all duration-200"
+          className="w-full pl-10 pr-9 py-2 text-sm rounded-full bg-dark-surface/90 hover:bg-dark-elevated/80 focus:bg-dark-surface text-white placeholder-dark-subtext border border-white/10 focus:border-brand/60 focus:outline-none focus:ring-2 focus:ring-brand/30 transition-all shadow-inner"
         />
+
         {query && (
-          <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+          <div className="absolute inset-y-0 right-0 flex items-center pr-2.5">
             <button
               type="button"
               onClick={handleClear}
-              className="p-1 rounded-full text-dark-subtext hover:text-white hover:bg-dark-surface transition-colors"
-              aria-label="Hapus pencarian"
+              className="p-1 rounded-full text-dark-subtext hover:text-white hover:bg-white/10 transition-colors"
+              aria-label="Hapus teks pencarian"
             >
-              <i className="fas fa-times"></i>
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
         )}
       </form>
 
-      {/* Suggestions Dropdown */}
+      {/* Suggestions & Search History Dropdown */}
       {shouldShowDropdown && (
-        <div className="absolute top-full left-0 right-0 mt-1.5 bg-dark-card border border-dark-highlight/80 rounded-2xl shadow-2xl overflow-hidden z-50 backdrop-blur-md divide-y divide-white/5 py-1 animate-in fade-in slide-in-from-top-1 duration-150">
+        <div className="absolute top-full left-0 right-0 mt-2 bg-dark-surface/95 border border-dark-border rounded-2xl shadow-2xl overflow-hidden z-50 backdrop-blur-2xl py-1.5 animate-in fade-in slide-in-from-top-2 duration-150">
           {showHistory && (
-            <div className="px-4 py-1.5 text-xs font-semibold text-dark-subtext uppercase tracking-wider flex items-center justify-between">
+            <div className="px-4 py-1.5 text-[11px] font-bold text-dark-muted uppercase tracking-wider flex items-center justify-between">
               <span>Pencarian Terakhir</span>
-              <i className="fas fa-clock text-xs opacity-60"></i>
+              <Clock className="w-3 h-3 opacity-60" />
             </div>
           )}
 
-          <ul className="max-h-72 overflow-y-auto divide-y divide-white/5">
+          <ul className="max-h-72 overflow-y-auto no-scrollbar divide-y divide-white/5">
             {itemsToShow.map((item, index) => {
               const isSelected = selectedIndex === index;
               return (
@@ -181,21 +203,19 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSearch, searchHistory = 
                   onMouseEnter={() => setSelectedIndex(index)}
                   className={`group flex items-center justify-between px-4 py-2.5 cursor-pointer text-sm transition-colors ${
                     isSelected
-                      ? 'bg-dark-surface text-brand-red font-semibold'
-                      : 'text-dark-text hover:bg-dark-surface hover:text-white'
+                      ? 'bg-dark-elevated text-brand font-semibold'
+                      : 'text-white/90 hover:bg-dark-elevated/60 hover:text-white'
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <i
-                      className={`text-xs flex-shrink-0 ${
-                        showHistory
-                          ? 'fas fa-history text-dark-subtext group-hover:text-white'
-                          : 'fas fa-search text-dark-subtext group-hover:text-brand-red'
-                      } ${isSelected ? 'text-brand-red' : ''}`}
-                    ></i>
+                    {showHistory ? (
+                      <Clock className="w-3.5 h-3.5 text-dark-muted flex-shrink-0" />
+                    ) : (
+                      <Search className="w-3.5 h-3.5 text-dark-muted group-hover:text-brand flex-shrink-0" />
+                    )}
                     <span className="truncate">{item}</span>
                   </div>
-                  
+
                   <button
                     type="button"
                     onClick={(e) => {
@@ -203,10 +223,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSearch, searchHistory = 
                       setQuery(item);
                       inputRef.current?.focus();
                     }}
-                    className="opacity-0 group-hover:opacity-100 p-1 text-dark-subtext hover:text-white transition-opacity rounded-full hover:bg-dark-highlight ml-2 flex-shrink-0"
-                    title="Salin ke kotak pencarian"
+                    className="opacity-0 group-hover:opacity-100 p-1 text-dark-muted hover:text-white transition-opacity rounded-full hover:bg-white/10 ml-2 flex-shrink-0"
+                    title="Masukkan ke pencarian"
                   >
-                    <i className="fas fa-arrow-up rotate-[-45deg] text-xs"></i>
+                    <ArrowUpRight className="w-3.5 h-3.5" />
                   </button>
                 </li>
               );

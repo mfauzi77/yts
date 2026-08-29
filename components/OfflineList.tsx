@@ -1,6 +1,7 @@
-
 import React from 'react';
 import type { VideoItem } from '../types';
+import { DownloadCloud, CheckCircle2, RefreshCw, Trash2, Info } from 'lucide-react';
+import { TrackCard } from './TrackCard';
 
 interface OfflineListProps {
   offlinePlaylist: VideoItem[];
@@ -13,183 +14,139 @@ interface OfflineListProps {
   onStartSync: () => void;
   syncingTrackProgress: number;
   playbackProgress?: number | string;
+  onToggleLike?: (track: VideoItem) => void;
+  likedTrackIds?: string[];
 }
 
-const OfflineItem: React.FC<{
-    item: VideoItem;
-    index: number;
-    onSelectTrack: (track: VideoItem, contextList: VideoItem[]) => void;
-    onRemoveFromOfflinePlaylist: (trackId: string) => void;
-    onSelectChannel: (channelId: string, channelTitle: string) => void;
-    isPlaying: boolean;
-    isSynced: boolean;
-    isSyncing: boolean;
-    offlinePlaylist: VideoItem[];
-    playbackProgress?: number | string;
-}> = ({ item, index, onSelectTrack, onRemoveFromOfflinePlaylist, onSelectChannel, isPlaying, isSynced, isSyncing, offlinePlaylist, playbackProgress }) => {
-    
-    return (
-        <div className="grid grid-cols-[20px_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
-            <div className="flex items-center justify-center text-dark-subtext">
-                <span className="group-hover:hidden">{index + 1}</span>
-                <button onClick={() => onSelectTrack(item, offlinePlaylist)} className="hidden group-hover:block" aria-label={`Putar ${item.snippet.title}`}>
-                    <i className="fas fa-play text-white"></i>
-                </button>
-            </div>
-            <div className="flex items-center gap-4 min-w-0">
-                <div className="relative flex-shrink-0">
-                    <img
-                        src={item.snippet.thumbnailData || item.snippet.thumbnails.default.url}
-                        alt={item.snippet.title}
-                        className="w-10 h-10 rounded-md object-cover"
-                    />
-                    {isSynced && (
-                        <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full w-4 h-4 flex items-center justify-center border-2 border-dark-bg">
-                            <i className="fas fa-check text-[8px] text-white"></i>
-                        </div>
-                    )}
-                </div>
-                <div className="min-w-0">
-                    <p className={`text-sm font-semibold truncate cursor-pointer ${isPlaying ? 'text-brand-red' : 'text-white'}`} onClick={() => onSelectTrack(item, offlinePlaylist)}>
-                        {item.snippet.title}
-                    </p>
-                    <p 
-                        className="text-xs text-dark-subtext cursor-pointer hover:underline truncate"
-                        onClick={() => onSelectChannel(item.snippet.channelId, item.snippet.channelTitle)}
-                    >
-                        {item.snippet.channelTitle}
-                    </p>
-                </div>
-            </div>
-            <div className="flex items-center space-x-3 flex-shrink-0">
-                {isPlaying && playbackProgress !== undefined && (
-                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-red/20 border border-brand-red/40 text-brand-red text-xs font-mono font-bold shadow-sm mr-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-brand-red animate-pulse"></span>
-                        <span>{typeof playbackProgress === 'number' ? `${playbackProgress}%` : playbackProgress}</span>
-                    </div>
-                )}
-                <div className="w-6 flex justify-center">
-                    {isSyncing && !isSynced ? (
-                         <i className="fas fa-spinner fa-spin text-brand-red text-xs"></i>
-                    ) : isSynced ? (
-                        <i className="fas fa-check-circle text-green-500 text-xs" title="Tersedia offline"></i>
-                    ) : (
-                        <i className="fas fa-cloud text-dark-subtext text-xs" title="Menunggu sinkronisasi"></i>
-                    )}
-                </div>
-                <button 
-                    onClick={() => onRemoveFromOfflinePlaylist(item.id.videoId)} 
-                    className="p-2 w-8 h-8 flex items-center justify-center rounded-full text-dark-subtext hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Hapus dari Offline"
-                >
-                    <i className="fas fa-trash-alt text-sm"></i>
-                </button>
-            </div>
-        </div>
-    );
-};
-
-export const OfflineList: React.FC<OfflineListProps> = ({ 
-    offlinePlaylist, 
-    syncedOfflineIds,
-    onSelectTrack, 
-    onRemoveFromOfflinePlaylist, 
-    onSelectChannel, 
-    currentTrackId,
-    isSyncing,
-    onStartSync,
-    syncingTrackProgress,
-    playbackProgress
+export const OfflineList: React.FC<OfflineListProps> = ({
+  offlinePlaylist,
+  syncedOfflineIds,
+  onSelectTrack,
+  onRemoveFromOfflinePlaylist,
+  onSelectChannel,
+  currentTrackId,
+  isSyncing,
+  onStartSync,
+  syncingTrackProgress,
+  onToggleLike,
+  likedTrackIds = [],
 }) => {
-  
-  const unsyncedCount = offlinePlaylist.filter(item => !syncedOfflineIds.includes(item.id.videoId)).length;
-  
+  const unsyncedCount = offlinePlaylist.filter(
+    (item) => !syncedOfflineIds.includes(item.id.videoId)
+  ).length;
+
   if (offlinePlaylist.length === 0) {
     return (
-      <div className="text-center py-10 text-dark-subtext">
-        <i className="fas fa-cloud-download-alt text-4xl mb-4"></i>
-        <p>Koleksi offline Anda kosong.</p>
-        <p className="text-sm">Klik ikon simpan pada lagu apa pun untuk mendengarkan tanpa koneksi.</p>
+      <div className="flex flex-col items-center justify-center py-20 text-center px-4">
+        <div className="w-16 h-16 rounded-full bg-[#181818] border border-[#282828] flex items-center justify-center mb-4 text-[#6b7280] shadow-lg">
+          <DownloadCloud className="w-8 h-8 text-emerald-400" />
+        </div>
+        <h3 className="text-lg font-bold text-white mb-1">Koleksi Offline Kosong</h3>
+        <p className="text-sm text-[#9ca3af] max-w-sm">
+          Simpan lagu favorit Anda agar tetap dapat didengarkan kapan pun meski tanpa kuota internet.
+        </p>
       </div>
     );
   }
 
   return (
-    <div>
-        <div className="mb-6 p-5 bg-dark-card rounded-xl border border-white/5">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                    <h2 className="text-xl font-bold flex items-center">
-                        <i className="fas fa-cloud-download-alt mr-3 text-brand-red"></i>
-                        Mode Offline
-                    </h2>
-                    <p className="text-sm text-dark-subtext mt-1">
-                        {isSyncing 
-                            ? `Menyinkronkan... ${Math.round(syncingTrackProgress)}%` 
-                            : `${offlinePlaylist.length - unsyncedCount} dari ${offlinePlaylist.length} lagu siap diputar offline.`}
-                    </p>
-                </div>
-                <button
-                    onClick={onStartSync}
-                    disabled={isSyncing || unsyncedCount === 0}
-                    className="w-full sm:w-auto px-6 py-2.5 bg-brand-red text-white font-bold rounded-full hover:bg-red-700 transition-all disabled:opacity-50 flex items-center justify-center shadow-lg shadow-red-900/20"
-                >
-                    {isSyncing ? (
-                        <>
-                            <i className="fas fa-spinner fa-spin mr-2"></i>
-                            Sinkron...
-                        </>
-                    ) : unsyncedCount === 0 ? (
-                        <>
-                            <i className="fas fa-check mr-2"></i>
-                            Sudah Sinkron
-                        </>
-                    ) : (
-                       <>
-                            <i className="fas fa-sync-alt mr-2"></i>
-                            Sinkronkan {unsyncedCount} Lagu
-                       </>
-                    )}
-                </button>
+    <div className="space-y-6 pb-12 select-none">
+      {/* Offline Status & Sync Card */}
+      <div className="p-5 md:p-6 bg-[#181818] rounded-2xl border border-[#282828] shadow-lg">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <DownloadCloud className="w-6 h-6 text-emerald-400" />
+              <h2 className="text-xl font-bold text-white">Mode Offline & Unduhan</h2>
             </div>
-            
-            {isSyncing && (
-                <div className="w-full bg-dark-bg h-1.5 rounded-full mt-6 overflow-hidden">
-                    <div 
-                        className="bg-brand-red h-full transition-all duration-500 ease-out"
-                        style={{ width: `${syncingTrackProgress}%` }}
-                    ></div>
-                </div>
-            )}
-        </div>
-
-        <div className="space-y-1">
-            {offlinePlaylist.map((item, index) => (
-                <OfflineItem 
-                    key={item.id.videoId} 
-                    item={item}
-                    index={index}
-                    onSelectTrack={onSelectTrack}
-                    onRemoveFromOfflinePlaylist={onRemoveFromOfflinePlaylist}
-                    onSelectChannel={onSelectChannel}
-                    isPlaying={currentTrackId === item.id.videoId}
-                    isSynced={syncedOfflineIds.includes(item.id.videoId)}
-                    isSyncing={isSyncing}
-                    offlinePlaylist={offlinePlaylist}
-                    playbackProgress={currentTrackId === item.id.videoId ? playbackProgress : undefined}
-                />
-            ))}
-        </div>
-
-        <div className="mt-8 p-4 rounded-lg bg-blue-500/5 border border-blue-500/20 text-xs text-dark-subtext leading-relaxed">
-            <p className="flex items-start">
-                <i className="fas fa-info-circle mr-2 mt-0.5 text-blue-400"></i>
-                <span>
-                    <strong>Catatan Offline:</strong> Fitur ini menyimpan metadata dan gambar sampul agar aplikasi tetap bisa dibuka tanpa internet. 
-                    Stream audio memerlukan data yang telah di-cache oleh browser saat lagu diputar sebelumnya. Pastikan untuk "Sinkronkan" saat Anda memiliki jaringan yang stabil.
-                </span>
+            <p className="text-xs md:text-sm text-[#9ca3af]">
+              {isSyncing
+                ? `Menyinkronkan data lagu... ${Math.round(syncingTrackProgress)}%`
+                : `${offlinePlaylist.length - unsyncedCount} dari ${offlinePlaylist.length} lagu siap diputar offline.`}
             </p>
+          </div>
+
+          <button
+            onClick={onStartSync}
+            disabled={isSyncing || unsyncedCount === 0}
+            className="w-full sm:w-auto px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-full hover:scale-105 active:scale-95 transition-all disabled:opacity-40 flex items-center justify-center gap-2 shadow-xl text-xs md:text-sm"
+          >
+            {isSyncing ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin text-black" />
+                <span>Menyinkronkan...</span>
+              </>
+            ) : unsyncedCount === 0 ? (
+              <>
+                <CheckCircle2 className="w-4 h-4 text-black" />
+                <span>Semua Tersinkron</span>
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4 text-black" />
+                <span>Sinkronkan ({unsyncedCount} Lagu)</span>
+              </>
+            )}
+          </button>
         </div>
+
+        {isSyncing && (
+          <div className="w-full bg-[#121212] h-2 rounded-full mt-4 overflow-hidden border border-[#282828]">
+            <div
+              className="bg-emerald-500 h-full transition-all duration-500 ease-out"
+              style={{ width: `${syncingTrackProgress}%` }}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Offline Track List */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between px-3 py-2 text-xs font-bold text-[#6b7280] uppercase tracking-wider border-b border-[#282828]">
+          <span>Daftar Unduhan ({offlinePlaylist.length})</span>
+          <span>Status</span>
+        </div>
+
+        {offlinePlaylist.map((item, index) => {
+          const isSynced = syncedOfflineIds.includes(item.id.videoId);
+          const isLiked = likedTrackIds.includes(item.id.videoId);
+          return (
+            <div key={item.id.videoId} className="group relative flex items-center">
+              <div className="flex-1 min-w-0">
+                <TrackCard
+                  item={item}
+                  index={index}
+                  isCurrent={currentTrackId === item.id.videoId}
+                  onSelect={(track) => onSelectTrack(track, offlinePlaylist)}
+                  onSelectChannel={onSelectChannel}
+                  onToggleLike={onToggleLike}
+                  isLiked={isLiked}
+                  isOffline={true}
+                  downloadState={{ status: isSynced ? 'saved' : 'idle' }}
+                  variant="row"
+                />
+              </div>
+
+              <button
+                onClick={() => onRemoveFromOfflinePlaylist(item.id.videoId)}
+                className="opacity-0 group-hover:opacity-100 p-2 rounded-full text-[#6b7280] hover:text-red-400 hover:bg-white/5 transition-all mr-2 flex-shrink-0"
+                title="Hapus dari Penyimpanan Offline"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Info notice */}
+      <div className="p-4 rounded-2xl bg-[#181818] border border-[#282828] text-xs text-[#9ca3af] flex items-start gap-3">
+        <Info className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+        <p className="leading-relaxed">
+          <strong>Catatan Offline:</strong> Metadata dan sampul tersimpan di penyimpanan browser lokal. Lagu yang telah diputar sebelumnya akan di-cache secara otomatis untuk pemutaran tanpa kuota.
+        </p>
+      </div>
     </div>
   );
 };
+
