@@ -1,5 +1,5 @@
 {
-  "name": "Remix YTS",
+  "name": "YTS",
   "description": "A minimalist, modern, and legal YouTube streamer. Search for songs, create playlists, and listen directly from YouTube. Features a sleek interface, playback history, and a visualizer.",
   "requestFramePermissions": [],
   "majorCapabilities": [

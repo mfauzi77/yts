@@ -1,7 +1,6 @@
+
 import React, { useState } from 'react';
 import type { VideoItem, YouTubePlaylist } from '../types';
-import { ChevronLeft, Play, ListMusic, User, ArrowDown, Loader2 } from 'lucide-react';
-import { TrackCard } from './TrackCard';
 
 interface ChannelViewProps {
   channelTitle: string;
@@ -19,170 +18,232 @@ interface ChannelViewProps {
   onLoadMore: () => void;
   hasNextPage: boolean;
   playbackProgress?: number | string;
-  onToggleLike?: (track: VideoItem) => void;
-  likedTrackIds?: string[];
 }
 
-export const ChannelView: React.FC<ChannelViewProps> = ({
-  channelTitle,
-  videos,
-  playlists,
-  isLoading,
-  isMoreLoading,
-  onSelectTrack,
-  onSelectPlaylist,
-  onBack,
-  onOpenAddToPlaylistModal,
-  onAddToOffline,
-  offlineItems,
-  currentTrackId,
-  onLoadMore,
-  hasNextPage,
-  onToggleLike,
-  likedTrackIds = [],
-}) => {
-  const [activeTab, setActiveTab] = useState<'videos' | 'playlists'>('videos');
-
-  return (
-    <div className="space-y-6 pb-12">
-      {/* Artist Profile Banner Header */}
-      <div className="relative rounded-3xl overflow-hidden bg-gradient-to-b from-dark-card via-dark-surface to-dark-bg p-5 md:p-8 border border-white/5 shadow-2xl">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-dark-card/60 hover:bg-dark-elevated text-dark-subtext hover:text-white border border-white/5 text-xs font-semibold transition-colors mb-4"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          <span>Kembali</span>
-        </button>
-
-        <div className="flex flex-col sm:flex-row items-center sm:items-end gap-5">
-          <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden bg-dark-card border-2 border-brand shadow-glow flex items-center justify-center flex-shrink-0">
-            <User className="w-12 h-12 text-brand" />
-          </div>
-
-          <div className="flex-1 text-center sm:text-left min-w-0 space-y-1">
-            <span className="text-[11px] font-extrabold uppercase tracking-widest text-brand">
-              Artis / Kreator
-            </span>
-            <h1 className="text-2xl md:text-4xl font-black text-white truncate leading-tight">
-              {channelTitle}
-            </h1>
-            <p className="text-xs md:text-sm text-dark-subtext">
-              {videos.length} lagu tersedia
+const ChannelVideoItem: React.FC<{
+    item: VideoItem;
+    onSelectTrack: (track: VideoItem, contextList: VideoItem[]) => void;
+    onOpenAddToPlaylistModal: (track: VideoItem) => void;
+    isOffline: boolean;
+    onAddToOffline: (track: VideoItem) => void;
+    isPlaying: boolean;
+    videoList: VideoItem[];
+    playbackProgress?: number | string;
+}> = ({ item, onSelectTrack, onOpenAddToPlaylistModal, isOffline, onAddToOffline, isPlaying, videoList, playbackProgress }) => (
+    <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
+        <div className="relative w-12 h-12">
+            <img
+                src={item.snippet.thumbnails.default.url}
+                alt={item.snippet.title}
+                className="w-full h-full rounded-md object-cover"
+            />
+             <button
+                onClick={() => onSelectTrack(item, videoList)}
+                className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-md"
+                aria-label={`Putar ${item.snippet.title}`}
+            >
+                <i className="fas fa-play text-white text-lg"></i>
+            </button>
+        </div>
+        <div className="min-w-0">
+            <p className={`text-sm font-semibold cursor-pointer ${isPlaying ? 'text-brand-red' : 'text-white'} [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden`} onClick={() => onSelectTrack(item, videoList)}>
+                {item.snippet.title}
             </p>
-          </div>
+             <p className="text-xs text-dark-subtext">
+                {new Date(item.snippet.publishedAt).toLocaleDateString()}
+            </p>
         </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-dark-border pb-2">
-        <button
-          onClick={() => setActiveTab('videos')}
-          className={`px-4 py-2 text-xs md:text-sm font-bold rounded-full transition-all ${
-            activeTab === 'videos'
-              ? 'bg-brand text-white shadow-glow'
-              : 'bg-dark-card text-dark-subtext hover:text-white'
-          }`}
-        >
-          Daftar Video ({videos.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('playlists')}
-          className={`px-4 py-2 text-xs md:text-sm font-bold rounded-full transition-all ${
-            activeTab === 'playlists'
-              ? 'bg-brand text-white shadow-glow'
-              : 'bg-dark-card text-dark-subtext hover:text-white'
-          }`}
-        >
-          Playlist Channel ({playlists.length})
-        </button>
-      </div>
-
-      {/* Loading */}
-      {isLoading ? (
-        <div className="flex justify-center items-center py-20">
-          <Loader2 className="w-10 h-10 text-brand animate-spin" />
-        </div>
-      ) : activeTab === 'videos' ? (
-        <div className="space-y-4">
-          <div className="space-y-1">
-            {videos.map((item, index) => {
-              const isOffline = offlineItems.some((o) => o.id.videoId === item.id.videoId);
-              const isLiked = likedTrackIds.includes(item.id.videoId);
-              return (
-                <TrackCard
-                  key={item.id.videoId}
-                  item={item}
-                  index={index}
-                  isCurrent={currentTrackId === item.id.videoId}
-                  onSelect={(track) => onSelectTrack(track, videos)}
-                  onOpenAddToPlaylist={onOpenAddToPlaylistModal}
-                  onToggleLike={onToggleLike}
-                  isLiked={isLiked}
-                  isOffline={isOffline}
-                  onDownload={onAddToOffline}
-                  variant="row"
-                />
-              );
-            })}
-          </div>
-
-          {hasNextPage && (
-            <div className="flex justify-center pt-4">
-              <button
-                onClick={onLoadMore}
-                disabled={isMoreLoading}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-dark-card hover:bg-dark-elevated text-white font-bold text-xs md:text-sm border border-white/10 active:scale-95 disabled:opacity-50 transition-all shadow-md"
-              >
-                {isMoreLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 text-brand animate-spin" />
-                    <span>Memuat lagu lainnya...</span>
-                  </>
-                ) : (
-                  <>
-                    <ArrowDown className="w-4 h-4" />
-                    <span>Muat Lebih Banyak</span>
-                  </>
-                )}
-              </button>
-            </div>
-          )}
-        </div>
-      ) : (
-        /* Channel Playlists */
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-          {playlists.length > 0 ? (
-            playlists.map((pl) => (
-              <div
-                key={pl.id}
-                onClick={() => onSelectPlaylist(pl)}
-                className="group p-3 rounded-2xl bg-dark-card/60 hover:bg-dark-elevated/90 border border-white/5 hover:border-white/15 transition-all cursor-pointer shadow-card"
-              >
-                <div className="relative aspect-square rounded-xl overflow-hidden mb-3 bg-dark-surface">
-                  <img
-                    src={pl.snippet.thumbnails.medium?.url || pl.snippet.thumbnails.default.url}
-                    alt={pl.snippet.title}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Play className="w-8 h-8 text-white fill-current" />
-                  </div>
+        <div className="flex items-center space-x-1 flex-shrink-0">
+            {isPlaying && playbackProgress !== undefined && (
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-red/20 border border-brand-red/40 text-brand-red text-xs font-mono font-bold shadow-sm mr-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand-red animate-pulse"></span>
+                    <span>{typeof playbackProgress === 'number' ? `${playbackProgress}%` : playbackProgress}</span>
                 </div>
-                <h4 className="font-bold text-sm text-white line-clamp-1">{pl.snippet.title}</h4>
-                <p className="text-xs text-dark-subtext mt-0.5">
-                  {pl.contentDetails.itemCount} lagu
-                </p>
-              </div>
-            ))
-          ) : (
-            <div className="col-span-full py-16 text-center text-dark-subtext">
-              <ListMusic className="w-12 h-12 text-dark-muted mx-auto mb-2" />
-              <p>Channel ini tidak memiliki playlist publik.</p>
+            )}
+            <div className="flex items-center space-x-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                <button
+                    onClick={() => onOpenAddToPlaylistModal(item)}
+                    className="p-2 w-10 rounded-full text-dark-subtext hover:text-white transition-colors duration-200"
+                    title="Tambahkan ke playlist"
+                >
+                    <i className="fas fa-plus"></i>
+                </button>
             </div>
-          )}
         </div>
-      )}
     </div>
-  );
+);
+
+const ChannelPlaylistItem: React.FC<{
+    playlist: YouTubePlaylist;
+    onSelectPlaylist: (playlist: YouTubePlaylist) => void;
+}> = ({ playlist, onSelectPlaylist }) => (
+    <div 
+        onClick={() => onSelectPlaylist(playlist)}
+        className="grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group cursor-pointer"
+    >
+        <div className="relative w-12 h-12">
+            <img
+                src={playlist.snippet.thumbnails.default.url}
+                alt={playlist.snippet.title}
+                className="w-full h-full rounded-md object-cover"
+            />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-md">
+                <i className="fas fa-list text-white text-xs"></i>
+            </div>
+        </div>
+        <div className="min-w-0">
+            <p className="text-sm font-semibold text-white truncate">
+                {playlist.snippet.title}
+            </p>
+            <p className="text-xs text-dark-subtext">
+                {playlist.contentDetails.itemCount} lagu
+            </p>
+        </div>
+        <div className="text-dark-subtext">
+            <i className="fas fa-chevron-right"></i>
+        </div>
+    </div>
+);
+
+export const ChannelView: React.FC<ChannelViewProps> = ({ 
+    channelTitle, 
+    videos, 
+    playlists,
+    isLoading, 
+    isMoreLoading,
+    onSelectTrack, 
+    onSelectPlaylist,
+    onBack,
+    onOpenAddToPlaylistModal,
+    onAddToOffline,
+    offlineItems,
+    currentTrackId,
+    onLoadMore,
+    hasNextPage,
+    playbackProgress,
+}) => {
+    const [activeTab, setActiveTab] = useState<'videos' | 'playlists'>('videos');
+
+    return (
+        <>
+            <div className="flex-shrink-0 pt-6 pb-4 px-2 md:px-0 flex items-center">
+                <button onClick={onBack} className="md:hidden p-2 mr-2 -ml-2 rounded-full hover:bg-dark-surface">
+                    <i className="fas fa-arrow-left text-white"></i>
+                </button>
+                <h1 className="text-3xl md:text-4xl font-bold text-white truncate">
+                    {channelTitle}
+                </h1>
+            </div>
+
+            <div className="flex border-b border-dark-card mb-4">
+                <button 
+                    onClick={() => setActiveTab('videos')}
+                    className={`px-4 py-2 text-sm font-semibold transition-colors ${activeTab === 'videos' ? 'text-brand-red border-b-2 border-brand-red' : 'text-dark-subtext hover:text-white'}`}
+                >
+                    Video
+                </button>
+                <button 
+                    onClick={() => setActiveTab('playlists')}
+                    className={`px-4 py-2 text-sm font-semibold transition-colors ${activeTab === 'playlists' ? 'text-brand-red border-b-2 border-brand-red' : 'text-dark-subtext hover:text-white'}`}
+                >
+                    Playlist
+                </button>
+            </div>
+
+            {isLoading ? (
+                 <div className="flex justify-center items-center h-64">
+                    <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-brand-red"></div>
+                </div>
+            ) : (
+                <div className="mt-4 space-y-2">
+                   {activeTab === 'videos' ? (
+                       <>
+                           {videos.map(item => (
+                               <ChannelVideoItem
+                                    key={item.id.videoId}
+                                    item={item}
+                                    onSelectTrack={onSelectTrack}
+                                    onOpenAddToPlaylistModal={onOpenAddToPlaylistModal}
+                                    isOffline={offlineItems.some(o => o.id.videoId === item.id.videoId)}
+                                    onAddToOffline={onAddToOffline}
+                                    isPlaying={currentTrackId === item.id.videoId}
+                                    videoList={videos}
+                                    playbackProgress={currentTrackId === item.id.videoId ? playbackProgress : undefined}
+                               />
+                           ))}
+                           
+                           {isMoreLoading && (
+                               <div className="space-y-2 mt-2">
+                                   {[1, 2, 3].map((skeletonIndex) => (
+                                       <div 
+                                           key={`channel-skeleton-${skeletonIndex}`} 
+                                           className="grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 rounded-md bg-dark-card/40 animate-pulse border border-white/5"
+                                       >
+                                           <div className="w-12 h-12 rounded bg-dark-surface/80" />
+                                           <div className="space-y-2 py-1">
+                                               <div className="h-3.5 bg-dark-surface/90 rounded w-3/4" />
+                                               <div className="h-2.5 bg-dark-surface/50 rounded w-1/3" />
+                                           </div>
+                                           <div className="w-6 h-6 rounded-full bg-dark-surface/50" />
+                                       </div>
+                                   ))}
+                               </div>
+                           )}
+
+                           {hasNextPage && (
+                               <div className="flex justify-center py-6">
+                                   <button
+                                       onClick={onLoadMore}
+                                       disabled={isMoreLoading}
+                                       className={`flex items-center justify-center gap-2.5 px-6 py-2.5 rounded-full font-semibold text-sm transition-all duration-300 shadow-md ${
+                                           isMoreLoading
+                                               ? 'bg-dark-surface border border-brand-red/40 text-brand-red cursor-wait'
+                                               : 'bg-dark-card hover:bg-dark-surface hover:border-dark-highlight border border-transparent text-white active:scale-95'
+                                       }`}
+                                   >
+                                       {isMoreLoading ? (
+                                           <>
+                                               <svg className="animate-spin h-4 w-4 text-brand-red" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                               </svg>
+                                               <span>Memuat video...</span>
+                                               <span className="flex space-x-1 items-center ml-1">
+                                                   <span className="w-1.5 h-1.5 bg-brand-red rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                                   <span className="w-1.5 h-1.5 bg-brand-red rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                                   <span className="w-1.5 h-1.5 bg-brand-red rounded-full animate-bounce"></span>
+                                               </span>
+                                           </>
+                                       ) : (
+                                           <>
+                                               <i className="fas fa-arrow-down text-xs opacity-70"></i>
+                                               <span>Muat Lebih Banyak</span>
+                                           </>
+                                       )}
+                                   </button>
+                               </div>
+                           )}
+                       </>
+                   ) : (
+                       <>
+                           {playlists.length > 0 ? (
+                               playlists.map(playlist => (
+                                   <ChannelPlaylistItem 
+                                        key={playlist.id}
+                                        playlist={playlist}
+                                        onSelectPlaylist={onSelectPlaylist}
+                                   />
+                               ))
+                           ) : (
+                               <div className="text-center py-10 text-dark-subtext">
+                                   <i className="fas fa-list-ul text-4xl mb-4"></i>
+                                   <p>Channel ini tidak memiliki playlist publik.</p>
+                               </div>
+                           )}
+                       </>
+                   )}
+                </div>
+            )}
+        </>
+    );
 };

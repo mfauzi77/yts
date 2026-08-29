@@ -1,28 +1,11 @@
-import React, { useState, lazy, Suspense } from 'react';
+import React, { useState, useEffect, lazy, Suspense, useRef } from 'react';
 import type { VideoItem } from '../types';
 import { FloatingParticles } from './FloatingParticles';
-import {
-  ChevronDown,
-  Heart,
-  Play,
-  Pause,
-  SkipBack,
-  SkipForward,
-  Repeat,
-  Shuffle,
-  Mic2,
-  Activity,
-  Disc3,
-  Plus,
-  Sparkles,
-} from 'lucide-react';
 
-const AudioVisualizerCanvas = lazy(() =>
-  import('./AudioVisualizerCanvas').then((m) => ({ default: m.AudioVisualizerCanvas }))
-);
-const LyricsView = lazy(() =>
-  import('./LyricsView').then((m) => ({ default: m.LyricsView }))
-);
+// Lazy load child components
+const AudioVisualizerCanvas = lazy(() => import('./AudioVisualizerCanvas').then(m => ({ default: m.AudioVisualizerCanvas })));
+const LyricsView = lazy(() => import('./LyricsView').then(m => ({ default: m.LyricsView })));
+
 
 interface NowPlayingViewProps {
   isOpen: boolean;
@@ -39,306 +22,183 @@ interface NowPlayingViewProps {
   seekTo: (time: number) => void;
   isAutoplayEnabled: boolean;
   onToggleAutoplay: () => void;
-  isShuffleEnabled?: boolean;
-  onToggleShuffle?: () => void;
   children?: React.ReactNode;
   isLiked: boolean;
   onToggleLike: () => void;
-  onOpenAddToPlaylist?: (track: VideoItem) => void;
-  onSelectChannel?: (channelId: string, channelTitle: string) => void;
 }
 
 const formatTime = (seconds: number) => {
-  if (isNaN(seconds) || seconds < 0) return '0:00';
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = Math.floor(seconds % 60);
-  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+    if (isNaN(seconds) || seconds < 0) return '0:00';
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 };
+
+const ViewPlaceholder: React.FC = () => (
+    <div className="w-full h-full bg-dark-card/50 rounded-lg animate-pulse" />
+);
 
 export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
-  isOpen,
-  onClose,
-  track,
-  isPlaying,
-  setIsPlaying,
-  onNext,
-  onPrev,
-  currentTime,
-  duration,
-  seekTo,
-  isAutoplayEnabled,
-  onToggleAutoplay,
-  isShuffleEnabled = false,
-  onToggleShuffle,
-  children,
-  isLiked,
-  onToggleLike,
-  onOpenAddToPlaylist,
-  onSelectChannel,
+    isOpen, onClose, track, isPlaying, setIsPlaying, onNext, onPrev,
+    volume, setVolume, currentTime, duration, seekTo, isAutoplayEnabled, onToggleAutoplay,
+    children, isLiked, onToggleLike
 }) => {
-  const [activeTab, setActiveTab] = useState<'cover' | 'lyrics' | 'visualizer'>('cover');
-  const [showParticles, setShowParticles] = useState(false);
-  const [isSeeking, setIsSeeking] = useState(false);
-  const [seekVal, setSeekVal] = useState(currentTime);
+    const [showVisualizer, setShowVisualizer] = useState(false);
+    const [showVisualEffect, setShowVisualEffect] = useState(false);
+    const [viewMode, setViewMode] = useState<'album' | 'lyrics'>('album');
+    
+    const imageUrl = track.snippet.thumbnails.medium?.url || track.snippet.thumbnails.default.url;
 
-  const imageUrl =
-    track.snippet.thumbnailData ||
-    track.snippet.thumbnails.high?.url ||
-    track.snippet.thumbnails.medium?.url ||
-    track.snippet.thumbnails.default.url;
+    useEffect(() => {
+        if (!isOpen) {
+            // Reset state if needed when closed
+        }
+    }, [isOpen]);
 
-  if (!isOpen) return null;
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col bg-[#121212] text-white overflow-hidden animate-in fade-in duration-200 select-none"
-      role="dialog"
-      aria-modal="true"
-    >
-      {/* Background Ambient Glow Layer */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <img
-          src={imageUrl}
-          alt=""
-          className="w-full h-full object-cover blur-[100px] scale-150 opacity-25"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-[#121212]/85 to-[#121212]" />
-        {showParticles && <FloatingParticles />}
-      </div>
-
-      {/* Main Container */}
-      <div className="relative z-10 flex flex-col h-full max-w-lg mx-auto w-full px-6 py-4 md:py-6 justify-between">
-        {/* Top Header Bar */}
-        <div className="flex items-center justify-between w-full flex-shrink-0">
-          <button
-            onClick={onClose}
-            className="w-10 h-10 rounded-full hover:bg-white/10 active:scale-95 flex items-center justify-center text-white transition-colors"
-            aria-label="Tutup pemutar"
-          >
-            <ChevronDown className="w-6 h-6" />
-          </button>
-
-          {/* Mode Switcher Pills */}
-          <div className="flex items-center bg-[#1c1c1c] rounded-full p-1 border border-[#282828]">
-            <button
-              onClick={() => setActiveTab('cover')}
-              className={`px-3 py-1 text-xs font-bold rounded-full transition-all flex items-center gap-1.5 ${
-                activeTab === 'cover'
-                  ? 'bg-white text-black shadow-sm'
-                  : 'text-[#9ca3af] hover:text-white'
-              }`}
-            >
-              <Disc3 className="w-3.5 h-3.5" />
-              <span>Lagu</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('lyrics')}
-              className={`px-3 py-1 text-xs font-bold rounded-full transition-all flex items-center gap-1.5 ${
-                activeTab === 'lyrics'
-                  ? 'bg-white text-black shadow-sm'
-                  : 'text-[#9ca3af] hover:text-white'
-              }`}
-            >
-              <Mic2 className="w-3.5 h-3.5" />
-              <span>Lirik</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('visualizer')}
-              className={`px-3 py-1 text-xs font-bold rounded-full transition-all flex items-center gap-1.5 ${
-                activeTab === 'visualizer'
-                  ? 'bg-white text-black shadow-sm'
-                  : 'text-[#9ca3af] hover:text-white'
-              }`}
-            >
-              <Activity className="w-3.5 h-3.5" />
-              <span>Visual</span>
-            </button>
-          </div>
-
-          <button
-            onClick={() => setShowParticles((p) => !p)}
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-              showParticles ? 'text-emerald-400' : 'text-[#9ca3af] hover:text-white'
-            }`}
-            title="Efek Ambient"
-          >
-            <Sparkles className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Center Main Stage: Large Artwork / Lyrics / Visualizer */}
-        <div className="flex-1 flex items-center justify-center my-4 min-h-0">
-          {activeTab === 'cover' && (
-            <div className="relative w-full max-w-[340px] sm:max-w-[380px] aspect-square rounded-2xl overflow-hidden shadow-2xl bg-[#181818] border border-[#282828]">
-              <img
-                src={imageUrl}
-                alt={track.snippet.title}
-                className="w-full h-full object-cover"
-              />
+    return (
+        <div 
+            className={`fixed inset-0 z-40 transition-opacity duration-300 ease-in-out ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+            aria-modal="true"
+            role="dialog"
+        >
+            {/* Background */}
+            <div className="absolute inset-0" onClick={onClose}>
+                <img src={imageUrl} alt="" className="w-full h-full object-cover blur-3xl scale-110 opacity-60" />
+                <div className="absolute inset-0 bg-black/80"></div>
+                {showVisualEffect && <FloatingParticles />}
             </div>
-          )}
+            
+            <div 
+                onClick={e => e.stopPropagation()}
+                className={`
+                    absolute bottom-0 left-0 right-0 z-10 
+                    h-[85vh] md:h-full 
+                    w-full 
+                    bg-dark-surface/80 backdrop-blur-xl rounded-t-3xl
+                    md:bg-transparent md:backdrop-blur-none md:rounded-none
+                    flex flex-col items-center justify-start pt-12 p-4
+                    md:justify-center md:pt-0 md:p-6 text-white
+                    transition-transform duration-300 ease-in-out
+                    ${isOpen ? 'translate-y-0' : 'translate-y-full md:translate-y-0'}
+                `}>
+                
+                {children}
 
-          {activeTab === 'lyrics' && (
-            <div className="w-full h-full max-h-[52vh] overflow-y-auto no-scrollbar rounded-xl bg-[#181818]/90 p-5 border border-[#282828]">
-              <Suspense
-                fallback={
-                  <div className="flex items-center justify-center h-full text-[#9ca3af]">
-                    <span>Memuat lirik...</span>
-                  </div>
-                }
-              >
-                <LyricsView track={track} />
-              </Suspense>
-            </div>
-          )}
+                {/* Mobile Handle */}
+                <div className="absolute top-3 w-12 h-1.5 bg-white/20 rounded-full md:hidden"></div>
 
-          {activeTab === 'visualizer' && (
-            <div className="w-full h-full max-h-[52vh] rounded-xl overflow-hidden bg-[#181818]/90 p-3 border border-[#282828] flex items-center justify-center">
-              <Suspense
-                fallback={
-                  <div className="flex items-center justify-center h-full text-[#9ca3af]">
-                    <span>Memuat visualizer...</span>
-                  </div>
-                }
-              >
-                <AudioVisualizerCanvas isPlaying={isPlaying} />
-              </Suspense>
-            </div>
-          )}
-        </div>
-
-        {/* Bottom Section: Info, Scrubber, Controls */}
-        <div className="w-full space-y-4 flex-shrink-0">
-          {/* Song Title, Artist & Like */}
-          <div className="flex items-center justify-between gap-3 sm:gap-4">
-            <div className="min-w-0 flex-1">
-              <h2
-                className="text-base sm:text-lg md:text-2xl font-bold md:font-black text-white line-clamp-2 leading-snug"
-                title={track.snippet.title}
-              >
-                {track.snippet.title}
-              </h2>
-              <p
-                className="text-xs sm:text-sm md:text-base text-[#9ca3af] hover:text-white hover:underline truncate cursor-pointer mt-1 font-medium"
-                onClick={() => {
-                  if (onSelectChannel) {
-                    onClose();
-                    onSelectChannel(track.snippet.channelId, track.snippet.channelTitle);
-                  }
-                }}
-              >
-                {track.snippet.channelTitle}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              {onOpenAddToPlaylist && (
-                <button
-                  onClick={() => onOpenAddToPlaylist(track)}
-                  className="p-2.5 rounded-full hover:bg-white/10 text-white transition-colors"
-                  title="Tambah ke Playlist"
+                 <button 
+                    onClick={onClose} 
+                    className="absolute top-4 right-4 md:top-8 md:right-8 w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors z-50"
+                    aria-label="Tutup tampilan pemutar"
                 >
-                  <Plus className="w-5 h-5" />
+                    <i className="fas fa-chevron-down text-lg"></i>
                 </button>
-              )}
+                
+                {/* Album Art / Lyrics Container */}
+                <div className="relative z-20 transition-all duration-300 ease-in-out shadow-2xl w-full max-w-[350px] md:max-w-lg mx-auto aspect-square max-h-[50vh] md:max-h-[60vh] mb-8">
+                    {/* Data Saver Badge */}
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-lg">
+                        <i className="fas fa-leaf"></i>
+                        PENGHEMAT DATA AKTIF
+                    </div>
+                   <Suspense fallback={<ViewPlaceholder />}>
+                        {viewMode === 'lyrics' ? (
+                            <LyricsView track={track} />
+                        ) : (
+                            <div className="relative w-full h-full rounded-xl overflow-hidden bg-black ring-1 ring-white/10">
+                                {showVisualizer ? (
+                                    <AudioVisualizerCanvas isPlaying={isPlaying} />
+                                ) : (
+                                    <img 
+                                        src={imageUrl} 
+                                        alt={track.snippet.title} 
+                                        className="w-full h-full object-cover"
+                                    />
+                                )}
+                            </div>
+                        )}
+                   </Suspense>
+                </div>
+                    
+                {/* Controls */}
+                <div className="w-full max-w-lg text-center z-50 relative flex flex-col justify-end flex-grow md:flex-grow-0 pb-6 md:pb-0">
+                    <div className="flex items-center justify-between mb-2 md:mb-6 px-2">
+                        <div className="flex-1 text-left">
+                            <h1 className="text-xl md:text-2xl font-bold text-white truncate leading-tight" title={track.snippet.title}>{track.snippet.title}</h1>
+                            <p className="text-sm md:text-base text-gray-400 mt-1 truncate">{track.snippet.channelTitle}</p>
+                        </div>
+                        <button 
+                            onClick={onToggleLike}
+                            className={`w-12 h-12 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors flex-shrink-0 ml-4 ${isLiked ? 'text-brand-red' : 'text-white/60'}`}
+                            title={isLiked ? "Batal Suka" : "Suka"}
+                        >
+                            <i className={`${isLiked ? 'fas' : 'far'} fa-heart text-2xl`}></i>
+                        </button>
+                    </div>
 
-              <button
-                onClick={onToggleLike}
-                className={`p-2.5 rounded-full transition-colors active:scale-95 ${
-                  isLiked ? 'text-emerald-400' : 'text-[#9ca3af] hover:text-white'
-                }`}
-                title={isLiked ? 'Batal Suka' : 'Suka'}
-              >
-                <Heart className={`w-6 h-6 ${isLiked ? 'fill-current text-emerald-400' : ''}`} />
-              </button>
+                    <div className="space-y-2 mb-6 md:mb-8">
+                        <input
+                            type="range"
+                            min="0"
+                            max={duration || 0}
+                            value={currentTime}
+                            onChange={(e) => seekTo(Number(e.target.value))}
+                            className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-brand-red hover:h-2 transition-all"
+                        />
+                        <div className="flex justify-between text-xs font-medium text-gray-400 font-mono">
+                            <span>{formatTime(currentTime)}</span>
+                            <span>{formatTime(duration)}</span>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-between items-center px-2 md:px-8">
+                        <button
+                            onClick={() => setShowVisualEffect(p => !p)}
+                            title="Efek Visual"
+                            className={`w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-full text-white/60 hover:bg-white/10 hover:text-white transition-colors ${showVisualEffect ? 'text-brand-red !text-opacity-100 bg-white/5' : ''}`}
+                        >
+                            <i className="fas fa-magic text-lg"></i>
+                        </button>
+                        
+                        <button onClick={onPrev} className="w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-full text-white hover:bg-white/10 transition-colors">
+                            <i className="fas fa-step-backward text-2xl"></i>
+                        </button>
+                        
+                        <button 
+                            onClick={() => setIsPlaying(!isPlaying)} 
+                            className="w-16 h-16 md:w-20 md:h-20 flex items-center justify-center bg-white text-black rounded-full shadow-lg shadow-white/10 hover:scale-105 active:scale-95 transition-all"
+                        >
+                            <i className={`fas ${isPlaying ? 'fa-pause' : 'fa-play'} text-3xl md:text-4xl ml-1`}></i>
+                        </button>
+                        
+                        <button onClick={onNext} className="w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-full text-white hover:bg-white/10 transition-colors">
+                            <i className="fas fa-step-forward text-2xl"></i>
+                        </button>
+
+                        <button
+                            onClick={() => setViewMode(p => p === 'lyrics' ? 'album' : 'lyrics')}
+                            title="Lirik"
+                            className={`w-10 h-10 md:w-12 md:h-12 flex items-center justify-center rounded-full text-white/60 hover:bg-white/10 hover:text-white transition-colors ${viewMode === 'lyrics' ? 'text-brand-red !text-opacity-100 bg-white/5' : ''}`}
+                        >
+                            <i className="fas fa-microphone-alt text-lg"></i>
+                        </button>
+                    </div>
+                    
+                    {/* Secondary Controls Row */}
+                    <div className="flex justify-center items-center space-x-6 mt-6 md:mt-8">
+                        <button
+                            onClick={() => setShowVisualizer(p => !p)}
+                            disabled={viewMode !== 'album'}
+                            title="Visualizer"
+                            className={`text-xs flex flex-col items-center gap-1 ${showVisualizer && viewMode === 'album' ? 'text-brand-red' : 'text-gray-400 hover:text-white'} disabled:opacity-30`}
+                        >
+                            <i className="fas fa-chart-bar text-xl"></i>
+                            <span>Visual</span>
+                        </button>
+                    </div>
+                </div>
             </div>
-          </div>
-
-          {/* Timeline Scrubber */}
-          <div className="space-y-1">
-            <input
-              type="range"
-              min="0"
-              max={duration || 100}
-              value={isSeeking ? seekVal : currentTime}
-              onMouseDown={() => setIsSeeking(true)}
-              onTouchStart={() => setIsSeeking(true)}
-              onChange={(e) => setSeekVal(Number(e.target.value))}
-              onMouseUp={(e) => {
-                setIsSeeking(false);
-                seekTo(Number((e.target as HTMLInputElement).value));
-              }}
-              onTouchEnd={(e) => {
-                setIsSeeking(false);
-                seekTo(Number((e.target as HTMLInputElement).value));
-              }}
-              className="w-full h-1.5 bg-[#282828] rounded-full appearance-none cursor-pointer accent-white hover:accent-emerald-500 transition-all"
-            />
-            <div className="flex justify-between text-xs font-mono text-[#9ca3af] px-0.5">
-              <span>{formatTime(isSeeking ? seekVal : currentTime)}</span>
-              <span>{formatTime(duration)}</span>
-            </div>
-          </div>
-
-          {/* Main Controls Row */}
-          <div className="flex items-center justify-between px-2 pt-1 pb-2">
-            {onToggleShuffle ? (
-              <button
-                onClick={onToggleShuffle}
-                className={`p-2.5 rounded-full transition-colors ${
-                  isShuffleEnabled ? 'text-emerald-400' : 'text-[#9ca3af] hover:text-white'
-                }`}
-                title="Acak"
-              >
-                <Shuffle className="w-5 h-5" />
-              </button>
-            ) : (
-              <div className="w-10" />
-            )}
-
-            <button
-              onClick={onPrev}
-              className="p-2.5 rounded-full text-white hover:bg-white/10 active:scale-95 transition-all"
-              title="Lagu Sebelumnya"
-            >
-              <SkipBack className="w-7 h-7 fill-current" />
-            </button>
-
-            <button
-              onClick={() => setIsPlaying(!isPlaying)}
-              className="w-16 h-16 rounded-full bg-emerald-500 text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-2xl p-4"
-              title={isPlaying ? 'Jeda' : 'Putar'}
-            >
-              {isPlaying ? (
-                <Pause className="w-8 h-8 fill-current text-black" />
-              ) : (
-                <Play className="w-8 h-8 fill-current text-black ml-1" />
-              )}
-            </button>
-
-            <button
-              onClick={onNext}
-              className="p-2.5 rounded-full text-white hover:bg-white/10 active:scale-95 transition-all"
-              title="Lagu Berikutnya"
-            >
-              <SkipForward className="w-7 h-7 fill-current" />
-            </button>
-
-            <button
-              onClick={onToggleAutoplay}
-              className={`p-2.5 rounded-full transition-colors ${
-                isAutoplayEnabled ? 'text-emerald-400' : 'text-[#9ca3af] hover:text-white'
-              }`}
-              title={isAutoplayEnabled ? 'Putar Otomatis Aktif' : 'Putar Otomatis Nonaktif'}
-            >
-              <Repeat className="w-5 h-5" />
-            </button>
-          </div>
         </div>
-
-        {children}
-      </div>
-    </div>
-  );
+    );
 };
-
