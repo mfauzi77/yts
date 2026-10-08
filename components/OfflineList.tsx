@@ -39,9 +39,10 @@ const OfflineItem: React.FC<{
             <div className="flex items-center gap-4 min-w-0">
                 <div className="relative flex-shrink-0">
                     <img
-                        src={item.snippet.thumbnailData || item.snippet.thumbnails.default.url}
-                        alt={item.snippet.title}
+                        src={item.snippet?.thumbnailData || item.snippet?.thumbnails?.default?.url || item.snippet?.thumbnails?.medium?.url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=120&auto=format&fit=crop&q=60'}
+                        alt={item.snippet?.title || 'Lagu'}
                         className="w-10 h-10 rounded-md object-cover"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=120&auto=format&fit=crop&q=60'; }}
                     />
                     {isSynced && (
                         <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full w-4 h-4 flex items-center justify-center border-2 border-dark-bg">

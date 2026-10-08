@@ -11,6 +11,9 @@ interface HistoryListProps {
   onAddToOffline: (track: VideoItem) => void;
   currentTrackId?: string | null;
   playbackProgress?: number | string;
+  getDownloadState?: (videoId: string) => any;
+  onDownloadTrack?: (track: VideoItem) => void;
+  onDeleteDownload?: (videoId: string) => void;
 }
 
 const HistoryItem: React.FC<{
@@ -27,9 +30,10 @@ const HistoryItem: React.FC<{
     <div className={`grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group ${isPlaying ? 'bg-dark-highlight/50' : ''}`}>
         <div className="relative w-12 h-12">
             <img
-                src={item.snippet.thumbnails.default.url}
-                alt={item.snippet.title}
+                src={item.snippet?.thumbnails?.default?.url || item.snippet?.thumbnails?.medium?.url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=120&auto=format&fit=crop&q=60'}
+                alt={item.snippet?.title || 'Lagu'}
                 className="w-full h-full rounded-md object-cover"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=120&auto=format&fit=crop&q=60'; }}
             />
             {isPlaying ? (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-md">

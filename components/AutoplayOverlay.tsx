@@ -7,7 +7,10 @@ interface AutoplayOverlayProps {
 }
 
 export const AutoplayOverlay: React.FC<AutoplayOverlayProps> = ({ track, onForcePlay }) => {
-  const imageUrl = track.snippet.thumbnails.high?.url || track.snippet.thumbnails.default.url;
+  const imageUrl = track.snippet?.thumbnails?.high?.url 
+    || track.snippet?.thumbnails?.medium?.url 
+    || track.snippet?.thumbnails?.default?.url 
+    || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=480&auto=format&fit=crop&q=60';
 
   return (
     <div className="absolute inset-0 z-20 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center text-center p-4">

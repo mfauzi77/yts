@@ -32,7 +32,12 @@ export const SharedPlaylistModal: React.FC<SharedPlaylistModalProps> = ({
                 <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
                     {playlist.tracks.map((track, idx) => (
                         <div key={track.id.videoId || idx} className="flex items-center gap-3 p-2 rounded bg-dark-surface">
-                            <img src={track.snippet.thumbnails.default.url} alt="" className="w-10 h-10 object-cover rounded" />
+                            <img 
+                                src={track.snippet?.thumbnails?.default?.url || track.snippet?.thumbnails?.medium?.url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=120&auto=format&fit=crop&q=60'} 
+                                alt="" 
+                                className="w-10 h-10 object-cover rounded"
+                                onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=120&auto=format&fit=crop&q=60'; }}
+                            />
                             <div className="overflow-hidden">
                                 <p className="text-sm font-medium truncate">{track.snippet.title}</p>
                                 <p className="text-xs text-gray-400 truncate">{track.snippet.channelTitle}</p>

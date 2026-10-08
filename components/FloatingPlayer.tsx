@@ -69,12 +69,13 @@ export const FloatingPlayer: React.FC<FloatingPlayerProps> = ({ track, isPlaying
       onMouseDown={handleMouseDown}
     >
       <img
-        src={track.snippet.thumbnails.default.url}
-        alt={track.snippet.title}
+        src={track.snippet?.thumbnails?.default?.url || track.snippet?.thumbnails?.medium?.url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=120&auto=format&fit=crop&q=60'}
+        alt={track.snippet?.title || 'Lagu'}
         className="w-16 h-16 rounded-lg object-cover flex-shrink-0 pointer-events-none drag-handle cursor-grab border border-white/10"
+        onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=120&auto=format&fit=crop&q=60'; }}
       />
       <div className="flex-grow min-w-0">
-        <p className="text-sm font-bold text-white truncate pointer-events-none">{track.snippet.title}</p>
+        <p className="text-sm font-bold text-white truncate pointer-events-none">{track.snippet?.title || 'Lagu tanpa judul'}</p>
         <div className="flex items-center space-x-3 mt-2">
           <button onClick={onPrev} className="text-dark-subtext hover:text-white transition-colors">
             <i className="fas fa-step-backward"></i>

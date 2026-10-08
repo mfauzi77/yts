@@ -25,6 +25,12 @@ interface NowPlayingViewProps {
   children?: React.ReactNode;
   isLiked: boolean;
   onToggleLike: () => void;
+  isShuffle?: boolean;
+  onToggleShuffle?: () => void;
+  isLocalMode?: boolean;
+  downloadState?: any;
+  onDownload?: () => void;
+  onDeleteDownload?: () => void;
 }
 
 const formatTime = (seconds: number) => {
@@ -47,7 +53,10 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
     const [showVisualEffect, setShowVisualEffect] = useState(false);
     const [viewMode, setViewMode] = useState<'album' | 'lyrics'>('album');
     
-    const imageUrl = track.snippet.thumbnails.medium?.url || track.snippet.thumbnails.default.url;
+    const imageUrl = track.snippet?.thumbnails?.medium?.url 
+        || track.snippet?.thumbnails?.default?.url 
+        || track.snippet?.thumbnails?.high?.url 
+        || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=480&auto=format&fit=crop&q=60';
 
     useEffect(() => {
         if (!isOpen) {

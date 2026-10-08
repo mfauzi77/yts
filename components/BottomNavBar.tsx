@@ -1,7 +1,6 @@
 
 import React from 'react';
-
-type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'offline' | 'channel' | 'video' | 'settings';
+import type { MainView } from '../types';
 
 interface BottomNavBarProps {
   activeView: MainView;

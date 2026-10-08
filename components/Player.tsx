@@ -16,6 +16,12 @@ interface PlayerProps {
   seekTo: (seconds: number) => void;
   isAutoplayEnabled: boolean;
   onToggleAutoplay: () => void;
+  isShuffle?: boolean;
+  onToggleShuffle?: () => void;
+  isLocalMode?: boolean;
+  downloadState?: any;
+  onDownload?: () => void;
+  onDeleteDownload?: () => void;
 }
 
 const formatTime = (seconds: number) => {
@@ -51,6 +57,11 @@ export const Player: React.FC<PlayerProps> = ({
 
     const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
 
+    const fallbackThumb = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=120&auto=format&fit=crop&q=60';
+    const thumbUrl = track.snippet?.thumbnails?.default?.url 
+        || track.snippet?.thumbnails?.medium?.url 
+        || fallbackThumb;
+
     return (
         <div className="relative bg-dark-surface border-t border-dark-card/50">
              {/* Mobile Progress Bar */}
@@ -62,14 +73,15 @@ export const Player: React.FC<PlayerProps> = ({
             <div className="md:hidden px-3 py-2 flex items-center justify-between bg-dark-surface/95 backdrop-blur-md shadow-lg border-t border-white/10">
                 <div className="flex items-center space-x-3 min-w-0 flex-1">
                     <img 
-                        src={track.snippet.thumbnails.default.url} 
-                        alt={track.snippet.title} 
+                        src={thumbUrl} 
+                        alt={track.snippet?.title || 'Lagu'} 
                         className="w-11 h-11 rounded-md object-cover flex-shrink-0 border border-white/10 shadow-md"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).src = fallbackThumb; }}
                     />
                     <div className="min-w-0">
-                        <p className="font-semibold text-sm text-white truncate">{track.snippet.title}</p>
+                        <p className="font-semibold text-sm text-white truncate">{track.snippet?.title || 'Lagu tanpa judul'}</p>
                         <p className="text-xs text-dark-subtext truncate hover:underline" onClick={handleChannelClick}>
-                            {track.snippet.channelTitle}
+                            {track.snippet?.channelTitle || 'Artis'}
                         </p>
                     </div>
                 </div>
@@ -96,15 +108,16 @@ export const Player: React.FC<PlayerProps> = ({
                 {/* Left: Track Info */}
                 <div className="flex items-center space-x-4">
                     <img 
-                        src={track.snippet.thumbnails.default.url} 
-                        alt={track.snippet.title} 
+                        src={thumbUrl} 
+                        alt={track.snippet?.title || 'Lagu'} 
                         className="w-14 h-14 rounded-md object-cover cursor-pointer hover:opacity-80 transition-opacity"
                         onClick={onToggleNowPlaying}
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).src = fallbackThumb; }}
                     />
                     <div className="min-w-0">
-                        <p className="font-semibold text-sm cursor-pointer hover:underline truncate" onClick={onToggleNowPlaying}>{track.snippet.title}</p>
+                        <p className="font-semibold text-sm cursor-pointer hover:underline truncate" onClick={onToggleNowPlaying}>{track.snippet?.title || 'Lagu tanpa judul'}</p>
                         <p className="text-xs text-dark-subtext cursor-pointer hover:underline" onClick={handleChannelClick}>
-                            {track.snippet.channelTitle}
+                            {track.snippet?.channelTitle || 'Artis'}
                         </p>
                     </div>
                 </div>

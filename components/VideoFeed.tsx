@@ -27,9 +27,10 @@ const MusicCard: React.FC<{
     <div className="group relative bg-dark-card rounded-lg overflow-hidden hover:bg-dark-surface transition-all duration-300 hover:shadow-xl">
         <div className="aspect-square relative cursor-pointer" onClick={onSelectTrack}>
             <img
-                src={item.snippet.thumbnails.medium?.url || item.snippet.thumbnails.default.url}
-                alt={item.snippet.title}
+                src={item.snippet?.thumbnails?.medium?.url || item.snippet?.thumbnails?.default?.url || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=120&auto=format&fit=crop&q=60'}
+                alt={item.snippet?.title || 'Video'}
                 className="w-full h-full object-cover"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=120&auto=format&fit=crop&q=60'; }}
             />
             <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors"></div>
             {isPlaying && (playbackTime || playbackProgress !== undefined) && (

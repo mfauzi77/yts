@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 
 import { SearchBar } from './components/SearchBar';
 import { getChannelVideos, getRelatedVideos, searchVideos, getChannelPlaylists, getPlaylistItems } from './services/youtubeService';
 import { useLocalStorage } from './hooks/useLocalStorage';
-import type { VideoItem, Playlist, YouTubePlaylist } from './types';
+import type { VideoItem, Playlist, YouTubePlaylist, MainView } from './types';
 import { useYouTubePlayer } from './hooks/useYouTubePlayer';
 import { useOfflinePlayer } from './hooks/useOfflinePlayer';
 import { useDownloadManager } from './hooks/useDownloadManager';
@@ -15,19 +15,19 @@ import { AutoplayOverlay } from './components/AutoplayOverlay';
 import { SharedPlaylistModal } from './components/SharedPlaylistModal';
 import { getSharedPlaylistFromCurrentUrl, clearShareParam } from './services/sharePlaylist';
 
+import { ChannelView } from './components/ChannelView';
+import { PlaylistDetailView } from './components/PlaylistDetailView';
+import { ErrorBoundary } from './components/ErrorBoundary';
+
 // Lazy load components
 const Player = lazy(() => import('./components/Player').then(m => ({ default: m.Player })));
 const SearchResultList = lazy(() => import('./components/SearchResultsList').then(m => ({ default: m.SearchResultList })));
 const PlaylistListView = lazy(() => import('./components/Playlist').then(m => ({ default: m.PlaylistListView })));
 const HistoryList = lazy(() => import('./components/HistoryList').then(m => ({ default: m.HistoryList })));
 const NowPlayingView = lazy(() => import('./components/NowPlayingView').then(m => ({ default: m.NowPlayingView })));
-const ChannelView = lazy(() => import('./components/ChannelView').then(m => ({ default: m.ChannelView })));
 const AddToPlaylistModal = lazy(() => import('./components/AddToPlaylistModal').then(m => ({ default: m.AddToPlaylistModal })));
-const PlaylistDetailView = lazy(() => import('./components/PlaylistDetailView').then(m => ({ default: m.PlaylistDetailView })));
 const SettingsView = lazy(() => import('./components/SettingsView').then(m => ({ default: m.SettingsView })));
 
-
-type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'offline' | 'channel' | 'youtubePlaylistDetail' | 'settings';
 type ApiStatus = 'idle' | 'success' | 'error';
 
 const LoadingSpinner: React.FC = () => (
@@ -57,7 +57,7 @@ const App: React.FC = () => {
     
     const [selectedYouTubePlaylist, setSelectedYouTubePlaylist] = useState<YouTubePlaylist | null>(null);
     const [youtubePlaylistVideos, setYoutubePlaylistVideos] = useState<VideoItem[]>([]);
-    const [_isYoutubePlaylistLoading, setIsYoutubePlaylistLoading] = useState<boolean>(false);
+    const [isYoutubePlaylistLoading, setIsYoutubePlaylistLoading] = useState<boolean>(false);
 
     const [apiStatus, setApiStatus] = useState<ApiStatus>('idle');
     const [isAppEntered, setIsAppEntered] = useState<boolean>(true);
@@ -494,15 +494,22 @@ const App: React.FC = () => {
 
         if ('mediaSession' in navigator) {
             try {
+                const thumbDefault = currentTrack.snippet?.thumbnails?.default?.url 
+                    || currentTrack.snippet?.thumbnails?.medium?.url 
+                    || currentTrack.snippet?.thumbnails?.high?.url 
+                    || '';
+                const thumbMedium = currentTrack.snippet?.thumbnails?.medium?.url || thumbDefault;
+                const thumbHigh = currentTrack.snippet?.thumbnails?.high?.url || thumbMedium;
+
                 navigator.mediaSession.metadata = new MediaMetadata({
-                    title: currentTrack.snippet.title,
-                    artist: currentTrack.snippet.channelTitle,
+                    title: currentTrack.snippet?.title || 'Lagu',
+                    artist: currentTrack.snippet?.channelTitle || 'Artis',
                     album: 'YTS Music',
                     artwork: [
-                        { src: currentTrack.snippet.thumbnails.default.url, sizes: '120x90', type: 'image/jpeg' },
-                        { src: currentTrack.snippet.thumbnails.medium?.url || currentTrack.snippet.thumbnails.default.url, sizes: '320x180', type: 'image/jpeg' },
-                        { src: currentTrack.snippet.thumbnails.high?.url || currentTrack.snippet.thumbnails.default.url, sizes: '480x360', type: 'image/jpeg' },
-                    ]
+                        { src: thumbDefault, sizes: '120x90', type: 'image/jpeg' },
+                        { src: thumbMedium, sizes: '320x180', type: 'image/jpeg' },
+                        { src: thumbHigh, sizes: '480x360', type: 'image/jpeg' },
+                    ].filter(a => !!a.src)
                 });
             } catch (e) {
                 console.warn('Failed to set MediaMetadata:', e);
@@ -570,10 +577,13 @@ const App: React.FC = () => {
         if ((window as any).AndroidBridge) {
             try {
                 if (typeof (window as any).AndroidBridge.onTrackChanged === 'function') {
+                    const thumbUrl = currentTrack.snippet?.thumbnails?.medium?.url 
+                        || currentTrack.snippet?.thumbnails?.default?.url 
+                        || '';
                     (window as any).AndroidBridge.onTrackChanged(JSON.stringify({
-                        title: currentTrack.snippet.title,
-                        artist: currentTrack.snippet.channelTitle,
-                        thumbnail: currentTrack.snippet.thumbnails.medium?.url || currentTrack.snippet.thumbnails.default.url,
+                        title: currentTrack.snippet?.title || '',
+                        artist: currentTrack.snippet?.channelTitle || '',
+                        thumbnail: thumbUrl,
                         videoId: currentTrack.id.videoId,
                         isPlaying: isPlayingRef.current,
                         duration: activeDurationRef.current,
@@ -629,9 +639,11 @@ const App: React.FC = () => {
             prev: () => playPrevRef.current(),
             getState: () => ({
                 isPlaying: isPlayingRef.current,
-                title: currentTrackRef.current?.snippet.title || '',
-                artist: currentTrackRef.current?.snippet.channelTitle || '',
-                thumbnail: currentTrackRef.current?.snippet.thumbnails.medium?.url || currentTrackRef.current?.snippet.thumbnails.default.url || '',
+                title: currentTrackRef.current?.snippet?.title || '',
+                artist: currentTrackRef.current?.snippet?.channelTitle || '',
+                thumbnail: currentTrackRef.current?.snippet?.thumbnails?.medium?.url 
+                    || currentTrackRef.current?.snippet?.thumbnails?.default?.url 
+                    || '',
                 currentTime: activeCurrentTimeRef.current,
                 duration: activeDurationRef.current,
             })
@@ -703,16 +715,24 @@ const App: React.FC = () => {
     }, [selectedChannel, channelNextPageToken, isChannelMoreLoading]);
 
     const handleSelectYouTubePlaylist = useCallback(async (playlist: YouTubePlaylist) => {
+        if (!playlist || !playlist.id) {
+            console.warn('handleSelectYouTubePlaylist called with invalid playlist:', playlist);
+            return;
+        }
         setIsYoutubePlaylistLoading(true);
         setSelectedYouTubePlaylist(playlist);
         setActiveView('youtubePlaylistDetail');
         setYoutubePlaylistVideos([]);
+        setError(null);
         try {
             const { items } = await getPlaylistItems(playlist.id);
-            setYoutubePlaylistVideos(items);
+            setYoutubePlaylistVideos(items || []);
             setApiStatus('success');
-        } catch (err) { handleApiError(err); }
-        finally { setIsYoutubePlaylistLoading(false); }
+        } catch (err) { 
+            handleApiError(err); 
+        } finally { 
+            setIsYoutubePlaylistLoading(false); 
+        }
     }, []);
 
     const handleEnterApp = () => {
@@ -824,13 +844,27 @@ const App: React.FC = () => {
                     onDeleteDownload={deleteOfflineTrack}
                 />;
             case 'youtubePlaylistDetail':
-                if (!selectedYouTubePlaylist) return null;
+                if (!selectedYouTubePlaylist) {
+                    return (
+                        <div className="text-center py-12 text-dark-subtext">
+                            <i className="fas fa-exclamation-circle text-3xl mb-3 text-brand-red"></i>
+                            <p className="font-semibold text-white">Playlist tidak ditemukan atau belum dipilih.</p>
+                            <button
+                                onClick={() => setActiveView(selectedChannel ? 'channel' : 'home')}
+                                className="mt-4 px-5 py-2 bg-brand-red hover:bg-red-700 text-white text-sm font-semibold rounded-full transition-colors"
+                            >
+                                Kembali
+                            </button>
+                        </div>
+                    );
+                }
                 return <PlaylistDetailView
                     playlist={{
                         id: selectedYouTubePlaylist.id,
-                        name: selectedYouTubePlaylist.snippet.title,
+                        name: selectedYouTubePlaylist.snippet?.title || 'Playlist',
                         tracks: youtubePlaylistVideos
                     }}
+                    isLoading={isYoutubePlaylistLoading}
                     onSelectTrack={handleSelectTrack}
                     onRemoveFromPlaylist={() => {}} // Cannot remove from YouTube playlist
                     onSelectChannel={handleSelectChannel}
@@ -842,7 +876,7 @@ const App: React.FC = () => {
                     onToggleShuffle={() => setIsShuffle(p => !p)}
                     offlineItems={offlineItems}
                     onAddToOffline={handleAddToOffline}
-                    onBack={() => setActiveView('channel')}
+                    onBack={() => setActiveView(selectedChannel ? 'channel' : 'home')}
                     onDelete={() => {}} // Cannot delete YouTube playlist
                     onRename={() => {}} // Cannot rename YouTube playlist
                     isYouTubePlaylist={true}
@@ -964,7 +998,7 @@ const App: React.FC = () => {
                     <header className="flex-shrink-0 z-10 p-2 md:p-4">
                         <div className="container mx-auto flex items-center justify-between">
                             <div className="flex-1 max-w-lg">
-                                <SearchBar onSearch={handleSearch} searchHistory={searchHistory} />
+                                <SearchBar onSearch={handleSearch} />
                             </div>
                             <div className="flex items-center space-x-4">
                                <ApiStatusIndicator status={apiStatus} />
@@ -975,9 +1009,14 @@ const App: React.FC = () => {
                     <main className="flex-grow p-2 md:p-4 overflow-y-auto pb-36 md:pb-4 bg-gradient-to-b from-dark-highlight to-dark-bg rounded-t-lg">
                         <div className="container mx-auto">
                            {error && <ErrorDisplay message={error} onDismiss={() => setError(null)} />}
-                           <Suspense fallback={<LoadingSpinner />}>
-                                {renderMainView()}
-                           </Suspense>
+                           <ErrorBoundary 
+                               fallbackTitle="Gagal Menampilkan Konten"
+                               onReset={() => setActiveView('home')}
+                           >
+                               <Suspense fallback={<LoadingSpinner />}>
+                                    {renderMainView()}
+                               </Suspense>
+                           </ErrorBoundary>
                         </div>
                     </main>
                 </div>

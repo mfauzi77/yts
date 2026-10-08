@@ -153,6 +153,11 @@ const getChannelUploadsPlaylistId = async (channelId: string): Promise<string | 
 };
 
 export const getPlaylistItems = async (playlistId: string, maxResults = 50, pageToken?: string): Promise<ApiResponse> => {
+    if (!playlistId || typeof playlistId !== 'string') {
+        console.warn('getPlaylistItems called with invalid playlistId:', playlistId);
+        return { items: [], nextPageToken: undefined };
+    }
+
     const params = new URLSearchParams({
         part: 'snippet',
         playlistId: playlistId,
@@ -163,27 +168,48 @@ export const getPlaylistItems = async (playlistId: string, maxResults = 50, page
     }
     const data: PlaylistApiResponse = await fetchFromApiCore('/playlistItems', params);
     
-    // Transform PlaylistItem to VideoItem structure
+    // Transform PlaylistItem to VideoItem structure and guard against deleted/private videos
+    const fallbackImage = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=120&auto=format&fit=crop&q=60';
+
     const items: VideoItem[] = (data.items || [])
-        .filter(item => item.snippet?.resourceId?.videoId)
-        .map(item => ({
-            kind: 'youtube#searchResult',
-            etag: '',
-            id: {
-                kind: 'youtube#video',
-                videoId: item.snippet.resourceId.videoId,
-            },
-            snippet: {
-                publishedAt: item.snippet.publishedAt,
-                channelId: item.snippet.channelId,
-                title: item.snippet.title,
-                description: item.snippet.description,
-                thumbnails: item.snippet.thumbnails,
-                channelTitle: item.snippet.channelTitle,
-                liveBroadcastContent: 'none',
-                publishTime: item.snippet.publishedAt,
-            }
-        }));
+        .filter(item => {
+            const snip = item.snippet;
+            if (!snip || !snip.resourceId || !snip.resourceId.videoId) return false;
+            // Exclude private or deleted videos from playlist display
+            const title = snip.title || '';
+            if (title === 'Private video' || title === 'Deleted video') return false;
+            return true;
+        })
+        .map(item => {
+            const snip = item.snippet;
+            const thumbUrl = snip.thumbnails?.default?.url 
+                || snip.thumbnails?.medium?.url 
+                || snip.thumbnails?.high?.url 
+                || fallbackImage;
+
+            return {
+                kind: 'youtube#searchResult',
+                etag: '',
+                id: {
+                    kind: 'youtube#video',
+                    videoId: snip.resourceId.videoId,
+                },
+                snippet: {
+                    publishedAt: snip.publishedAt || new Date().toISOString(),
+                    channelId: snip.channelId || '',
+                    title: snip.title || 'Lagu tanpa judul',
+                    description: snip.description || '',
+                    thumbnails: {
+                        default: { url: thumbUrl, width: 120, height: 90 },
+                        medium: snip.thumbnails?.medium || { url: thumbUrl, width: 320, height: 180 },
+                        high: snip.thumbnails?.high || { url: thumbUrl, width: 480, height: 360 },
+                    },
+                    channelTitle: snip.channelTitle || 'Artis',
+                    liveBroadcastContent: 'none',
+                    publishTime: snip.publishedAt || new Date().toISOString(),
+                }
+            };
+        });
 
     return { items, nextPageToken: data.nextPageToken };
 };
@@ -203,8 +229,37 @@ export const getChannelPlaylists = async (channelId: string, maxResults = 50, pa
         params.set('pageToken', pageToken);
     }
     const data = await fetchFromApiCore('/playlists', params);
+    
+    const fallbackImage = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=120&auto=format&fit=crop&q=60';
+
+    const items: YouTubePlaylist[] = (data.items || [])
+        .filter((item: any) => item && item.id && item.snippet)
+        .map((item: any) => {
+            const snip = item.snippet;
+            const thumbUrl = snip.thumbnails?.default?.url 
+                || snip.thumbnails?.medium?.url 
+                || snip.thumbnails?.high?.url 
+                || fallbackImage;
+
+            return {
+                ...item,
+                snippet: {
+                    ...snip,
+                    title: snip.title || 'Playlist',
+                    thumbnails: {
+                        default: { url: thumbUrl, width: 120, height: 90 },
+                        medium: snip.thumbnails?.medium || { url: thumbUrl, width: 320, height: 180 },
+                        high: snip.thumbnails?.high || { url: thumbUrl, width: 480, height: 360 },
+                    }
+                },
+                contentDetails: {
+                    itemCount: item.contentDetails?.itemCount ?? 0
+                }
+            };
+        });
+
     return { 
-        items: data.items || [], 
+        items, 
         nextPageToken: data.nextPageToken 
     };
 };
@@ -226,40 +281,3 @@ export const getChannelVideos = async (channelId: string, _order: 'date' | 'view
     
     return getPlaylistItems(uploadsPlaylistId, maxResults, pageToken);
 };
-
-export const getSearchSuggestions = async (query: string): Promise<string[]> => {
-    if (typeof query !== 'string' || !query.trim()) {
-        return [];
-    }
-
-    const trimmed = query.trim();
-
-    try {
-        const response = await fetch(`/api/suggestions?q=${encodeURIComponent(trimmed)}`);
-        if (response.ok) {
-            const data = await response.json();
-            if (Array.isArray(data)) {
-                return data;
-            }
-        }
-    } catch (err) {
-        console.warn("Proxy suggestion request failed, fallbacking...", err);
-    }
-
-    // Direct client fallback
-    try {
-        const url = `https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&q=${encodeURIComponent(trimmed)}`;
-        const directRes = await fetch(url);
-        if (directRes.ok) {
-            const data = await directRes.json();
-            if (Array.isArray(data?.[1])) {
-                return data[1];
-            }
-        }
-    } catch (err) {
-        console.warn("Direct suggestion fetch failed:", err);
-    }
-
-    return [];
-};
-

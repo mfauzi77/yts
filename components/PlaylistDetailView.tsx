@@ -17,7 +17,15 @@ interface PlaylistDetailViewProps {
   onRename: (newName: string) => void;
   isYouTubePlaylist?: boolean;
   playbackProgress?: number | string;
+  isLoading?: boolean;
+  isShuffle?: boolean;
+  onToggleShuffle?: () => void;
+  getDownloadState?: (videoId: string) => any;
+  onDownloadTrack?: (track: VideoItem) => void;
+  onDeleteDownload?: (videoId: string) => void;
 }
+
+const fallbackThumb = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=120&auto=format&fit=crop&q=60';
 
 const PlaylistItem: React.FC<{
     item: VideoItem;
@@ -31,60 +39,75 @@ const PlaylistItem: React.FC<{
     playlistTracks: VideoItem[];
     isYouTubePlaylist?: boolean;
     playbackProgress?: number | string;
-}> = ({ item, index, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, isPlaying, isOffline, onAddToOffline, playlistTracks, isYouTubePlaylist, playbackProgress }) => (
-    <div className={`grid grid-cols-[20px_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group ${isPlaying ? 'bg-dark-highlight/50' : ''}`}>
-        <div className="flex items-center justify-center text-dark-subtext">
-            {isPlaying ? (
-                <div className="flex items-center justify-center">
-                    <span className="relative flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-                    </span>
-                </div>
-            ) : (
-                <>
-                    <span className="group-hover:hidden">{index + 1}</span>
-                    <button onClick={() => onSelectTrack(item, playlistTracks)} className="hidden group-hover:block" aria-label={`Putar ${item.snippet.title}`}>
-                        <i className="fas fa-play text-white"></i>
-                    </button>
-                </>
-            )}
-        </div>
-        <div className="flex items-center gap-4 min-w-0">
-             <img
-                src={item.snippet.thumbnails.default.url}
-                alt={item.snippet.title}
-                className="w-10 h-10 rounded-md object-cover flex-shrink-0"
-            />
-            <div className="min-w-0 flex-1">
-                <p className={`text-sm font-semibold cursor-pointer ${isPlaying ? 'text-brand-red' : 'text-white'} [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden`} onClick={() => onSelectTrack(item, playlistTracks)}>
-                    {item.snippet.title}
-                </p>
-                <p 
-                    className="text-xs text-dark-subtext cursor-pointer hover:underline"
-                    onClick={() => onSelectChannel(item.snippet.channelId, item.snippet.channelTitle)}
-                >
-                    {item.snippet.channelTitle}
-                </p>
-            </div>
-        </div>
-        <div className="flex items-center space-x-1 flex-shrink-0">
-            {isPlaying && playbackProgress !== undefined && (
-                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-red/20 border border-brand-red/40 text-brand-red text-xs font-mono font-bold shadow-sm mr-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-brand-red animate-pulse"></span>
-                    <span>{typeof playbackProgress === 'number' ? `${playbackProgress}%` : playbackProgress}</span>
-                </div>
-            )}
-            <div className="flex items-center space-x-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                {!isYouTubePlaylist && (
-                    <button onClick={() => onRemoveFromPlaylist(item.id.videoId)} className="p-2 w-10 rounded-full text-dark-subtext hover:text-white" title="Hapus dari playlist">
-                        <i className="fas fa-trash-alt"></i>
-                    </button>
+}> = ({ item, index, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, isPlaying, isOffline, onAddToOffline, playlistTracks, isYouTubePlaylist, playbackProgress }) => {
+    const thumbUrl = item.snippet?.thumbnails?.default?.url 
+        || item.snippet?.thumbnails?.medium?.url 
+        || fallbackThumb;
+
+    return (
+        <div className={`grid grid-cols-[20px_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group ${isPlaying ? 'bg-dark-highlight/50' : ''}`}>
+            <div className="flex items-center justify-center text-dark-subtext">
+                {isPlaying ? (
+                    <div className="flex items-center justify-center">
+                        <span className="relative flex h-3 w-3">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                        </span>
+                    </div>
+                ) : (
+                    <>
+                        <span className="group-hover:hidden text-xs">{index + 1}</span>
+                        <button onClick={() => onSelectTrack(item, playlistTracks)} className="hidden group-hover:block" aria-label={`Putar ${item.snippet?.title || 'Lagu'}`}>
+                            <i className="fas fa-play text-white"></i>
+                        </button>
+                    </>
                 )}
             </div>
+            <div className="flex items-center gap-4 min-w-0">
+                <div className="w-10 h-10 rounded-md bg-dark-card overflow-hidden flex-shrink-0 flex items-center justify-center">
+                    <img
+                        src={thumbUrl}
+                        alt={item.snippet?.title || 'Lagu'}
+                        className="w-10 h-10 rounded-md object-cover flex-shrink-0"
+                        onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src = fallbackThumb;
+                        }}
+                    />
+                </div>
+                <div className="min-w-0 flex-1">
+                    <p className={`text-sm font-semibold cursor-pointer ${isPlaying ? 'text-brand-red' : 'text-white'} [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden`} onClick={() => onSelectTrack(item, playlistTracks)}>
+                        {item.snippet?.title || 'Lagu tanpa judul'}
+                    </p>
+                    <p 
+                        className="text-xs text-dark-subtext cursor-pointer hover:underline truncate"
+                        onClick={() => {
+                            if (item.snippet?.channelId) {
+                                onSelectChannel(item.snippet.channelId, item.snippet.channelTitle || 'Channel');
+                            }
+                        }}
+                    >
+                        {item.snippet?.channelTitle || 'Artis'}
+                    </p>
+                </div>
+            </div>
+            <div className="flex items-center space-x-1 flex-shrink-0">
+                {isPlaying && playbackProgress !== undefined && (
+                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-red/20 border border-brand-red/40 text-brand-red text-xs font-mono font-bold shadow-sm mr-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-brand-red animate-pulse"></span>
+                        <span>{typeof playbackProgress === 'number' ? `${playbackProgress}%` : playbackProgress}</span>
+                    </div>
+                )}
+                <div className="flex items-center space-x-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                    {!isYouTubePlaylist && (
+                        <button onClick={() => onRemoveFromPlaylist(item.id.videoId)} className="p-2 w-10 rounded-full text-dark-subtext hover:text-white" title="Hapus dari playlist">
+                            <i className="fas fa-trash-alt"></i>
+                        </button>
+                    )}
+                </div>
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 const PlaylistHeader: React.FC<{
     playlist: Playlist;
@@ -160,17 +183,80 @@ const PlaylistHeader: React.FC<{
 };
 
 
-export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist, onSelectTrack, onRemoveFromPlaylist, onSelectChannel, currentTrackId, isAutoplayEnabled, onToggleAutoplay, offlineItems, onAddToOffline, onBack, onDelete, onRename, isYouTubePlaylist, playbackProgress }) => {
-  if (!playlist) return null;
+export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ 
+    playlist, 
+    onSelectTrack, 
+    onRemoveFromPlaylist, 
+    onSelectChannel, 
+    currentTrackId, 
+    isAutoplayEnabled, 
+    onToggleAutoplay, 
+    offlineItems, 
+    onAddToOffline, 
+    onBack, 
+    onDelete, 
+    onRename, 
+    isYouTubePlaylist, 
+    playbackProgress,
+    isLoading = false
+}) => {
+  if (!playlist) {
+    return (
+      <div className="text-center py-12 text-dark-subtext">
+        <p>Playlist tidak ditemukan.</p>
+        <button onClick={onBack} className="mt-4 px-5 py-2 bg-brand-red text-white text-sm font-semibold rounded-full hover:bg-red-700 transition-colors">
+          Kembali
+        </button>
+      </div>
+    );
+  }
 
-  if (playlist.tracks.length === 0) {
+  if (isLoading) {
+    return (
+      <div>
+        <PlaylistHeader playlist={playlist} onBack={onBack} onDelete={onDelete} onRename={onRename} isYouTubePlaylist={isYouTubePlaylist} />
+        <div className="flex items-center gap-2 mb-6">
+          <div className="h-8 w-28 bg-dark-card/60 rounded-full animate-pulse" />
+          <div className="h-6 w-24 bg-dark-card/40 rounded-full animate-pulse ml-auto" />
+        </div>
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5, 6].map((idx) => (
+            <div key={`pl-skeleton-${idx}`} className="grid grid-cols-[20px_1fr_auto] items-center gap-4 p-2 rounded-md bg-dark-card/30 animate-pulse border border-white/5">
+              <div className="w-4 h-4 bg-dark-surface/60 rounded" />
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="w-10 h-10 rounded-md bg-dark-surface/80 flex-shrink-0" />
+                <div className="space-y-1.5 flex-1 min-w-0">
+                  <div className="h-3.5 bg-dark-surface/90 rounded w-2/3" />
+                  <div className="h-2.5 bg-dark-surface/50 rounded w-1/3" />
+                </div>
+              </div>
+              <div className="w-6 h-6 rounded-full bg-dark-surface/40" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!playlist.tracks || playlist.tracks.length === 0) {
     return (
       <>
         <PlaylistHeader playlist={playlist} onBack={onBack} onDelete={onDelete} onRename={onRename} isYouTubePlaylist={isYouTubePlaylist} />
-        <div className="text-center py-10 text-dark-subtext">
-            <i className="fas fa-list-ul text-4xl mb-4"></i>
-            <p>Playlist ini kosong.</p>
-            {!isYouTubePlaylist && <p className="text-sm">Tambahkan lagu dari hasil pencarian untuk memulai.</p>}
+        <div className="text-center py-12 text-dark-subtext bg-dark-card/20 rounded-xl border border-white/5 mx-2 my-4">
+            <i className="fas fa-list-ul text-4xl mb-4 text-dark-subtext/60"></i>
+            <p className="font-semibold text-white">Playlist ini kosong atau video tidak tersedia.</p>
+            <p className="text-xs text-dark-subtext mt-1 max-w-sm mx-auto">
+              {isYouTubePlaylist 
+                ? 'Video di playlist ini mungkin disetel sebagai privat, dihapus oleh pengunggah, atau dibatasi wilayahnya.' 
+                : 'Tambahkan lagu dari hasil pencarian untuk memulai.'}
+            </p>
+            <button 
+              onClick={onBack} 
+              className="mt-5 px-6 py-2 bg-dark-card hover:bg-dark-surface text-white text-sm font-semibold rounded-full border border-white/10 transition-colors"
+            >
+              <i className="fas fa-arrow-left mr-2"></i>
+              Kembali
+            </button>
         </div>
       </>
     );
@@ -202,21 +288,21 @@ export const PlaylistDetailView: React.FC<PlaylistDetailViewProps> = ({ playlist
         </div>
         <div className="space-y-1">
           {playlist.tracks.map((item, index) => {
-            const isOffline = offlineItems.some(o => o.id.videoId === item.id.videoId);
+            const isOffline = offlineItems.some(o => o.id?.videoId === item.id?.videoId);
             return (
                 <PlaylistItem 
-                    key={item.id.videoId} 
+                    key={item.id?.videoId || `playlist-track-${index}`} 
                     item={item}
                     index={index}
                     onSelectTrack={onSelectTrack}
                     onRemoveFromPlaylist={onRemoveFromPlaylist}
                     onSelectChannel={onSelectChannel}
-                    isPlaying={currentTrackId === item.id.videoId}
+                    isPlaying={Boolean(currentTrackId && currentTrackId === item.id?.videoId)}
                     isOffline={isOffline}
                     onAddToOffline={onAddToOffline}
                     playlistTracks={playlist.tracks}
                     isYouTubePlaylist={isYouTubePlaylist}
-                    playbackProgress={currentTrackId === item.id.videoId ? playbackProgress : undefined}
+                    playbackProgress={currentTrackId === item.id?.videoId ? playbackProgress : undefined}
                 />
             )
           })}

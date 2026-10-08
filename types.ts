@@ -30,8 +30,11 @@ export interface VideoItem {
     channelTitle: string;
     liveBroadcastContent: string;
     publishTime: string;
+    thumbnailData?: string;
   };
 }
+
+export type MainView = 'home' | 'playlists' | 'playlistDetail' | 'history' | 'offline' | 'channel' | 'youtubePlaylistDetail' | 'video' | 'settings';
 
 export interface Playlist {
   id: string;

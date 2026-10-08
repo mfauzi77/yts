@@ -21,9 +21,10 @@ const PlaylistCard: React.FC<{
                 {playlist.tracks.slice(0, 4).map((track, index) => (
                     <img 
                         key={track.id.videoId + index}
-                        src={track.snippet.thumbnails?.medium?.url || track.snippet.thumbnails?.default?.url || 'https://picsum.photos/seed/music/200/200'}
+                        src={track.snippet?.thumbnails?.medium?.url || track.snippet?.thumbnails?.default?.url || 'https://picsum.photos/seed/music/200/200'}
                         alt=""
                         className="w-full h-full object-cover"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://picsum.photos/seed/music/200/200'; }}
                     />
                 ))}
                 {/* Fill empty grid cells if less than 4 tracks */}

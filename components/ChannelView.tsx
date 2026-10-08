@@ -18,7 +18,12 @@ interface ChannelViewProps {
   onLoadMore: () => void;
   hasNextPage: boolean;
   playbackProgress?: number | string;
+  getDownloadState?: (videoId: string) => any;
+  onDownloadTrack?: (track: VideoItem) => void;
+  onDeleteDownload?: (videoId: string) => void;
 }
+
+const fallbackThumb = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=120&auto=format&fit=crop&q=60';
 
 const ChannelVideoItem: React.FC<{
     item: VideoItem;
@@ -29,81 +34,99 @@ const ChannelVideoItem: React.FC<{
     isPlaying: boolean;
     videoList: VideoItem[];
     playbackProgress?: number | string;
-}> = ({ item, onSelectTrack, onOpenAddToPlaylistModal, isOffline, onAddToOffline, isPlaying, videoList, playbackProgress }) => (
-    <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
-        <div className="relative w-12 h-12">
-            <img
-                src={item.snippet.thumbnails.default.url}
-                alt={item.snippet.title}
-                className="w-full h-full rounded-md object-cover"
-            />
-             <button
-                onClick={() => onSelectTrack(item, videoList)}
-                className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-md"
-                aria-label={`Putar ${item.snippet.title}`}
-            >
-                <i className="fas fa-play text-white text-lg"></i>
-            </button>
-        </div>
-        <div className="min-w-0">
-            <p className={`text-sm font-semibold cursor-pointer ${isPlaying ? 'text-brand-red' : 'text-white'} [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden`} onClick={() => onSelectTrack(item, videoList)}>
-                {item.snippet.title}
-            </p>
-             <p className="text-xs text-dark-subtext">
-                {new Date(item.snippet.publishedAt).toLocaleDateString()}
-            </p>
-        </div>
-        <div className="flex items-center space-x-1 flex-shrink-0">
-            {isPlaying && playbackProgress !== undefined && (
-                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-red/20 border border-brand-red/40 text-brand-red text-xs font-mono font-bold shadow-sm mr-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-brand-red animate-pulse"></span>
-                    <span>{typeof playbackProgress === 'number' ? `${playbackProgress}%` : playbackProgress}</span>
-                </div>
-            )}
-            <div className="flex items-center space-x-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                <button
-                    onClick={() => onOpenAddToPlaylistModal(item)}
-                    className="p-2 w-10 rounded-full text-dark-subtext hover:text-white transition-colors duration-200"
-                    title="Tambahkan ke playlist"
+}> = ({ item, onSelectTrack, onOpenAddToPlaylistModal, isOffline, onAddToOffline, isPlaying, videoList, playbackProgress }) => {
+    const thumbUrl = item.snippet?.thumbnails?.default?.url 
+        || item.snippet?.thumbnails?.medium?.url 
+        || fallbackThumb;
+
+    return (
+        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group">
+            <div className="relative w-12 h-12 bg-dark-card rounded-md overflow-hidden">
+                <img
+                    src={thumbUrl}
+                    alt={item.snippet?.title || 'Video'}
+                    className="w-full h-full rounded-md object-cover"
+                    onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = fallbackThumb;
+                    }}
+                />
+                 <button
+                    onClick={() => onSelectTrack(item, videoList)}
+                    className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-md"
+                    aria-label={`Putar ${item.snippet?.title || 'Video'}`}
                 >
-                    <i className="fas fa-plus"></i>
+                    <i className="fas fa-play text-white text-lg"></i>
                 </button>
             </div>
+            <div className="min-w-0">
+                <p className={`text-sm font-semibold cursor-pointer ${isPlaying ? 'text-brand-red' : 'text-white'} [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden`} onClick={() => onSelectTrack(item, videoList)}>
+                    {item.snippet?.title || 'Lagu tanpa judul'}
+                </p>
+                 <p className="text-xs text-dark-subtext">
+                    {item.snippet?.publishedAt ? new Date(item.snippet.publishedAt).toLocaleDateString() : ''}
+                </p>
+            </div>
+            <div className="flex items-center space-x-1 flex-shrink-0">
+                {isPlaying && playbackProgress !== undefined && (
+                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-red/20 border border-brand-red/40 text-brand-red text-xs font-mono font-bold shadow-sm mr-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-brand-red animate-pulse"></span>
+                        <span>{typeof playbackProgress === 'number' ? `${playbackProgress}%` : playbackProgress}</span>
+                    </div>
+                )}
+                <div className="flex items-center space-x-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                    <button
+                        onClick={() => onOpenAddToPlaylistModal(item)}
+                        className="p-2 w-10 rounded-full text-dark-subtext hover:text-white transition-colors duration-200"
+                        title="Tambahkan ke playlist"
+                    >
+                        <i className="fas fa-plus"></i>
+                    </button>
+                </div>
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 const ChannelPlaylistItem: React.FC<{
     playlist: YouTubePlaylist;
     onSelectPlaylist: (playlist: YouTubePlaylist) => void;
-}> = ({ playlist, onSelectPlaylist }) => (
-    <div 
-        onClick={() => onSelectPlaylist(playlist)}
-        className="grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group cursor-pointer"
-    >
-        <div className="relative w-12 h-12">
-            <img
-                src={playlist.snippet.thumbnails.default.url}
-                alt={playlist.snippet.title}
-                className="w-full h-full rounded-md object-cover"
-            />
-            <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-md">
-                <i className="fas fa-list text-white text-xs"></i>
+}> = ({ playlist, onSelectPlaylist }) => {
+    const thumbUrl = playlist.snippet?.thumbnails?.default?.url 
+        || playlist.snippet?.thumbnails?.medium?.url 
+        || fallbackThumb;
+
+    return (
+        <div 
+            onClick={() => onSelectPlaylist(playlist)}
+            className="grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 rounded-md hover:bg-dark-highlight transition-colors duration-200 group cursor-pointer"
+        >
+            <div className="relative w-12 h-12 bg-dark-card rounded-md overflow-hidden flex items-center justify-center">
+                <img
+                    src={thumbUrl}
+                    alt={playlist.snippet?.title || 'Playlist'}
+                    className="w-full h-full rounded-md object-cover"
+                    onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = fallbackThumb;
+                    }}
+                />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-md">
+                    <i className="fas fa-list text-white text-xs"></i>
+                </div>
+            </div>
+            <div className="min-w-0">
+                <p className="text-sm font-semibold text-white truncate">
+                    {playlist.snippet?.title || 'Playlist'}
+                </p>
+                <p className="text-xs text-dark-subtext">
+                    {playlist.contentDetails?.itemCount ?? 0} lagu
+                </p>
+            </div>
+            <div className="text-dark-subtext">
+                <i className="fas fa-chevron-right"></i>
             </div>
         </div>
-        <div className="min-w-0">
-            <p className="text-sm font-semibold text-white truncate">
-                {playlist.snippet.title}
-            </p>
-            <p className="text-xs text-dark-subtext">
-                {playlist.contentDetails.itemCount} lagu
-            </p>
-        </div>
-        <div className="text-dark-subtext">
-            <i className="fas fa-chevron-right"></i>
-        </div>
-    </div>
-);
+    );
+};
 
 export const ChannelView: React.FC<ChannelViewProps> = ({ 
     channelTitle, 
