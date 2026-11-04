@@ -18,6 +18,8 @@ import { getSharedPlaylistFromCurrentUrl, clearShareParam } from './services/sha
 import { ChannelView } from './components/ChannelView';
 import { PlaylistDetailView } from './components/PlaylistDetailView';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { FloatingMiniVideo } from './components/FloatingMiniVideo';
+import { useVideoDock } from './hooks/useVideoDock';
 
 // Lazy load components
 const Player = lazy(() => import('./components/Player').then(m => ({ default: m.Player })));
@@ -27,6 +29,7 @@ const HistoryList = lazy(() => import('./components/HistoryList').then(m => ({ d
 const NowPlayingView = lazy(() => import('./components/NowPlayingView').then(m => ({ default: m.NowPlayingView })));
 const AddToPlaylistModal = lazy(() => import('./components/AddToPlaylistModal').then(m => ({ default: m.AddToPlaylistModal })));
 const SettingsView = lazy(() => import('./components/SettingsView').then(m => ({ default: m.SettingsView })));
+const YouTubeWatchView = lazy(() => import('./components/YouTubeWatchView').then(m => ({ default: m.YouTubeWatchView })));
 
 type ApiStatus = 'idle' | 'success' | 'error';
 
@@ -73,6 +76,8 @@ const App: React.FC = () => {
     const [isShuffle, setIsShuffle] = useLocalStorage<boolean>('ytas-shuffle', false);
     const [likedSongs, setLikedSongs] = useLocalStorage<string[]>('ytas-liked-songs', []);
     const [searchHistory, setSearchHistory] = useLocalStorage<string[]>('ytas-search-history', []);
+    const [isVideoMode, setIsVideoMode] = useLocalStorage<boolean>('ytas-video-mode', false);
+    const [videoSubView, setVideoSubView] = useState<'feed' | 'watch'>('feed');
 
     // Storage & Auto Cleanup Configuration
     const [historyLimit, setHistoryLimit] = useLocalStorage<number>('ytas-history-limit', 25);
@@ -84,9 +89,31 @@ const App: React.FC = () => {
     const [sleepTimerEndTime, setSleepTimerEndTime] = useState<number | null>(null);
     const [sleepTimerRemaining, setSleepTimerRemaining] = useState<number | null>(null);
 
+    // Dynamic Video Docking to align iframe with slot without reloading
+    useVideoDock({
+        isVideoMode,
+        activeView,
+        isNowPlayingViewOpen,
+        currentTrack,
+    });
+
+    const handleToggleVideoMode = useCallback((enabled?: boolean) => {
+        setIsVideoMode(prev => {
+            const nextVal = enabled !== undefined ? enabled : !prev;
+            if (nextVal) {
+                setActiveView('video');
+                setVideoSubView('watch');
+            }
+            return nextVal;
+        });
+    }, [setIsVideoMode]);
+
     const activeSetVolumeRef = useRef<(vol: number) => void>(() => {});
     const baseVolumeRef = useRef<number>(100);
     const sleepTimerEndTimeRef = useRef<number | null>(null);
+    const currentTrackRef = useRef<VideoItem | null>(null);
+    const videoTrackHistoryRef = useRef<VideoItem[]>([]);
+    const isNavigatingBackRef = useRef<boolean>(false);
 
     const handleSetSleepTimer = useCallback((minutes: number | null) => {
         if (minutes === null || minutes <= 0) {
@@ -353,6 +380,14 @@ const App: React.FC = () => {
     }, [setHistory, historyLimit]);
 
     const handleSelectTrack = useCallback((track: VideoItem, contextList: VideoItem[] = []) => {
+        if (currentTrackRef.current && currentTrackRef.current.id.videoId !== track.id.videoId && !isNavigatingBackRef.current) {
+            videoTrackHistoryRef.current.push(currentTrackRef.current);
+            if (videoTrackHistoryRef.current.length > 50) {
+                videoTrackHistoryRef.current.shift();
+            }
+        }
+        isNavigatingBackRef.current = false;
+
         setCurrentTrack(track);
         setIsPlaying(true);
         setIsAutoplayBlocked(false);
@@ -447,6 +482,43 @@ const App: React.FC = () => {
     const activeVolume      = offlinePlayerData.isLocalMode ? offlinePlayerData.localVolume      : volume;
     const activeSetVolume   = offlinePlayerData.isLocalMode ? offlinePlayerData.localSetVolume   : setVolume;
 
+    const handleVideoBack = useCallback(() => {
+        // Hentikan pemutaran video saat kembali dari mode tonton
+        setIsPlaying(false);
+        pauseRef.current();
+
+        // Tetap di tab video, dan kembali ke Beranda Video itu sendiri (bukan prev atau next)
+        setActiveView('video');
+        setVideoSubView('feed');
+    }, []);
+
+    // Tangani tombol Back browser/Android saat di tab video agar tetap di tab video dan kembali ke Beranda Video
+    useEffect(() => {
+        if (activeView === 'video') {
+            window.history.pushState({ ytsView: 'video', subView: videoSubView }, '');
+
+            const onPopState = () => {
+                if (activeView === 'video') {
+                    if (videoSubView === 'watch') {
+                        // Jika sedang menonton video, tombol back menghentikan video dan kembali ke Beranda Video
+                        setIsPlaying(false);
+                        pauseRef.current();
+                        setVideoSubView('feed');
+                        window.history.pushState({ ytsView: 'video', subView: 'feed' }, '');
+                    } else {
+                        // Jika sudah di Beranda Video, tetap di Beranda Video
+                        window.history.pushState({ ytsView: 'video', subView: 'feed' }, '');
+                    }
+                }
+            };
+
+            window.addEventListener('popstate', onPopState);
+            return () => {
+                window.removeEventListener('popstate', onPopState);
+            };
+        }
+    }, [activeView, videoSubView]);
+
     useEffect(() => { activeSetVolumeRef.current = activeSetVolume; }, [activeSetVolume]);
     useEffect(() => { sleepTimerEndTimeRef.current = sleepTimerEndTime; }, [sleepTimerEndTime]);
     useEffect(() => {
@@ -474,7 +546,6 @@ const App: React.FC = () => {
     const playPrevRef = useRef(playPrev);
     const activeSeekToRef = useRef(activeSeekTo);
     const isPlayingRef = useRef(isPlaying);
-    const currentTrackRef = useRef(currentTrack);
     const activeCurrentTimeRef = useRef(activeCurrentTime);
     const activeDurationRef = useRef(activeDuration);
 
@@ -747,8 +818,12 @@ const App: React.FC = () => {
                 fetchPersonalizedRecommendations();
             }
         }
+        if (view === 'video') {
+            setIsVideoMode(true);
+            setVideoSubView('feed'); // Selalu buka Beranda Video saat tab video diklik
+        }
         setActiveView(view);
-    }, [activeView, searchResults, fetchPersonalizedRecommendations]);
+    }, [activeView, searchResults, fetchPersonalizedRecommendations, setIsVideoMode]);
 
     const renderMainView = () => {
 
@@ -905,6 +980,41 @@ const App: React.FC = () => {
                     onSetSleepTimer={handleSetSleepTimer}
                     onBack={() => setActiveView('home')}
                 />;
+            case 'video':
+                return <YouTubeWatchView
+                    currentTrack={currentTrack}
+                    isPlaying={isPlaying}
+                    onTogglePlay={() => setIsPlaying(p => !p)}
+                    onNext={playNext}
+                    onPrev={playPrev}
+                    playbackList={activePlaybackList}
+                    onSelectTrack={handleSelectTrack}
+                    onSelectChannel={handleSelectChannel}
+                    onOpenAddToPlaylistModal={handleOpenAddToPlaylistModal}
+                    onToggleLike={handleToggleLike}
+                    isLiked={currentTrack ? likedSongs.includes(currentTrack.id.videoId) : false}
+                    isAutoplayEnabled={isAutoplayEnabled}
+                    onToggleAutoplay={() => setIsAutoplayEnabled(p => !p)}
+                    isShuffle={isShuffle}
+                    onToggleShuffle={() => setIsShuffle(p => !p)}
+                    isVideoMode={isVideoMode}
+                    onToggleVideoMode={handleToggleVideoMode}
+                    currentTime={activeCurrentTime}
+                    duration={activeDuration}
+                    seekTo={activeSeekTo}
+                    volume={activeVolume}
+                    setVolume={activeSetVolume}
+                    offlineItems={offlineItems}
+                    onAddToOffline={handleAddToOffline}
+                    onDownloadTrack={handleDownloadTrack}
+                    onDeleteDownload={deleteOfflineTrack}
+                    getDownloadState={getDownloadState}
+                    recommendations={recommendations}
+                    isLocalMode={offlinePlayerData.isLocalMode}
+                    videoSubView={videoSubView}
+                    onSubViewChange={setVideoSubView}
+                    onBack={handleVideoBack}
+                />;
             default: return null;
         }
     }
@@ -915,6 +1025,7 @@ const App: React.FC = () => {
         history: 'Riwayat',
         offline: 'Koleksi Offline',
         settings: 'Pengaturan & Pembersihan',
+        video: videoSubView === 'watch' ? 'Sedang Menonton Video' : 'Beranda Video',
     };
 
     return (
@@ -971,40 +1082,58 @@ const App: React.FC = () => {
 
 
                 <div className="flex flex-col overflow-hidden bg-dark-highlight">
-                    <div className="flex-shrink-0 pt-6 pb-4 px-2 md:px-4 flex items-center justify-between">
-                        <h1 className="text-3xl md:text-4xl font-bold text-white">
-                            {viewTitles[activeView] || 'YTS'}
-                        </h1>
-                        <div className="flex items-center gap-2">
-                            {sleepTimerRemaining !== null && sleepTimerRemaining > 0 && (
-                                <button
-                                    onClick={() => setActiveView('settings')}
-                                    className="flex items-center text-indigo-300 text-xs font-semibold bg-indigo-500/20 hover:bg-indigo-500/30 px-3 py-1.5 rounded-full border border-indigo-500/40 gap-1.5 transition-colors"
-                                    title="Pengatur Waktu Tidur Aktif - Klik untuk kelola"
-                                >
-                                    <i className="fas fa-moon text-indigo-400 animate-pulse"></i>
-                                    <span>{Math.floor(sleepTimerRemaining / 60)}m {sleepTimerRemaining % 60}s</span>
-                                </button>
-                            )}
-                            {!navigator.onLine && (
-                                <div className="flex items-center text-yellow-500 text-sm font-semibold bg-yellow-500/10 px-3 py-1 rounded-full border border-yellow-500/20">
-                                    <i className="fas fa-wifi-slash mr-2"></i>
-                                    Offline
+                    {activeView !== 'video' && (
+                        <>
+                            <div className="flex-shrink-0 pt-6 pb-4 px-2 md:px-4 flex items-center justify-between">
+                                <h1 className="text-3xl md:text-4xl font-bold text-white">
+                                    {viewTitles[activeView] || 'YTS'}
+                                </h1>
+                                <div className="flex items-center gap-2">
+                                    {/* Mode Video Quick Toggle */}
+                                    <button
+                                        onClick={() => handleToggleVideoMode()}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                                            isVideoMode 
+                                                ? 'bg-brand-red text-white border-brand-red shadow-lg shadow-red-900/30 ring-2 ring-red-500/20' 
+                                                : 'bg-dark-surface text-dark-subtext border-white/10 hover:text-white hover:border-white/20'
+                                        }`}
+                                        title={isVideoMode ? 'Beralih ke Mode Hemat Audio' : 'Beralih ke Mode Video YouTube'}
+                                    >
+                                        <i className={`fas ${isVideoMode ? 'fa-tv text-white' : 'fa-music text-brand-red'}`}></i>
+                                        <span className="hidden sm:inline">{isVideoMode ? 'Mode Video' : 'Mode Audio'}</span>
+                                    </button>
+
+                                    {sleepTimerRemaining !== null && sleepTimerRemaining > 0 && (
+                                        <button
+                                            onClick={() => setActiveView('settings')}
+                                            className="flex items-center text-indigo-300 text-xs font-semibold bg-indigo-500/20 hover:bg-indigo-500/30 px-3 py-1.5 rounded-full border border-indigo-500/40 gap-1.5 transition-colors"
+                                            title="Pengatur Waktu Tidur Aktif - Klik untuk kelola"
+                                        >
+                                            <i className="fas fa-moon text-indigo-400 animate-pulse"></i>
+                                            <span>{Math.floor(sleepTimerRemaining / 60)}m {sleepTimerRemaining % 60}s</span>
+                                        </button>
+                                    )}
+                                    {!navigator.onLine && (
+                                        <div className="flex items-center text-yellow-500 text-sm font-semibold bg-yellow-500/10 px-3 py-1 rounded-full border border-yellow-500/20">
+                                            <i className="fas fa-wifi-slash mr-2"></i>
+                                            Offline
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                        </div>
-                    </div>
-                    
-                    <header className="flex-shrink-0 z-10 p-2 md:p-4">
-                        <div className="container mx-auto flex items-center justify-between">
-                            <div className="flex-1 max-w-lg">
-                                <SearchBar onSearch={handleSearch} />
                             </div>
-                            <div className="flex items-center space-x-4">
-                               <ApiStatusIndicator status={apiStatus} />
-                            </div>
-                        </div>
-                    </header>
+                            
+                            <header className="flex-shrink-0 z-10 p-2 md:p-4">
+                                <div className="container mx-auto flex items-center justify-between">
+                                    <div className="flex-1 max-w-lg">
+                                        <SearchBar onSearch={handleSearch} />
+                                    </div>
+                                    <div className="flex items-center space-x-4">
+                                       <ApiStatusIndicator status={apiStatus} />
+                                    </div>
+                                </div>
+                            </header>
+                        </>
+                    )}
 
                     <main className="flex-grow p-2 md:p-4 overflow-y-auto pb-36 md:pb-4 bg-gradient-to-b from-dark-highlight to-dark-bg rounded-t-lg">
                         <div className="container mx-auto">
@@ -1045,6 +1174,8 @@ const App: React.FC = () => {
                                 downloadState={getDownloadState(currentTrack.id.videoId)}
                                 onDownload={() => handleDownloadTrack(currentTrack)}
                                 onDeleteDownload={() => deleteOfflineTrack(currentTrack.id.videoId)}
+                                isVideoMode={isVideoMode}
+                                onToggleVideoMode={handleToggleVideoMode}
                             />
                         </footer>
                     )}
@@ -1053,7 +1184,7 @@ const App: React.FC = () => {
                 <Suspense fallback={null}>
                     {currentTrack && (
                         <NowPlayingView
-                            isOpen={isNowPlayingViewOpen && typeof window !== 'undefined' && window.innerWidth >= 768}
+                            isOpen={isNowPlayingViewOpen}
                             onClose={() => setIsNowPlayingViewOpen(false)}
                             track={currentTrack}
                             isPlaying={isPlaying}
@@ -1075,6 +1206,8 @@ const App: React.FC = () => {
                             downloadState={getDownloadState(currentTrack.id.videoId)}
                             onDownload={() => handleDownloadTrack(currentTrack)}
                             onDeleteDownload={() => deleteOfflineTrack(currentTrack.id.videoId)}
+                            isVideoMode={isVideoMode}
+                            onToggleVideoMode={handleToggleVideoMode}
                         >
                             {isAutoplayBlocked && (
                                 <AutoplayOverlay track={currentTrack} onForcePlay={() => setIsPlaying(true)} />
@@ -1082,6 +1215,22 @@ const App: React.FC = () => {
                        </NowPlayingView>
                     )}
                 </Suspense>
+
+                {/* Floating Picture-in-Picture Mini Video when browsing other views or Beranda Video */}
+                {isVideoMode && currentTrack && !isNowPlayingViewOpen && (activeView !== 'video' || videoSubView === 'feed') && (
+                    <FloatingMiniVideo
+                        track={currentTrack}
+                        isPlaying={isPlaying}
+                        onTogglePlay={() => setIsPlaying(p => !p)}
+                        onNext={playNext}
+                        onPrev={playPrev}
+                        onExpand={() => {
+                            setActiveView('video');
+                            setVideoSubView('watch');
+                        }}
+                        onCloseVideoMode={() => setIsVideoMode(false)}
+                    />
+                )}
             </div>
             <BottomNavBar activeView={activeView} setActiveView={navigateToView} />
         </>

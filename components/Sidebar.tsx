@@ -42,6 +42,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) =
                     onClick={() => setActiveView('home')} 
                 />
                 <NavLink 
+                    icon="fa-tv" 
+                    label="Mode Video" 
+                    isActive={activeView === 'video'} 
+                    onClick={() => setActiveView('video')} 
+                />
+                <NavLink 
                     icon="fa-list-ul" 
                     label="Playlist" 
                     isActive={activeView === 'playlists' || activeView === 'playlistDetail'} 

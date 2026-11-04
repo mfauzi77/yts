@@ -22,6 +22,8 @@ interface PlayerProps {
   downloadState?: any;
   onDownload?: () => void;
   onDeleteDownload?: () => void;
+  isVideoMode?: boolean;
+  onToggleVideoMode?: (enabled?: boolean) => void;
 }
 
 const formatTime = (seconds: number) => {
@@ -35,7 +37,7 @@ const formatTime = (seconds: number) => {
 export const Player: React.FC<PlayerProps> = ({
     track, isPlaying, setIsPlaying, onNext, onPrev, onToggleNowPlaying,
     onSelectChannel, volume, setVolume, currentTime, duration, seekTo,
-    isAutoplayEnabled, onToggleAutoplay
+    isAutoplayEnabled, onToggleAutoplay, isVideoMode = false, onToggleVideoMode
 }) => {
     
     useEffect(() => {
@@ -71,7 +73,10 @@ export const Player: React.FC<PlayerProps> = ({
             
             {/* Mobile View */}
             <div className="md:hidden px-3 py-2 flex items-center justify-between bg-dark-surface/95 backdrop-blur-md shadow-lg border-t border-white/10">
-                <div className="flex items-center space-x-3 min-w-0 flex-1">
+                <div 
+                    className="flex items-center space-x-3 min-w-0 flex-1 cursor-pointer"
+                    onClick={onToggleNowPlaying}
+                >
                     <img 
                         src={thumbUrl} 
                         alt={track.snippet?.title || 'Lagu'} 
@@ -86,6 +91,16 @@ export const Player: React.FC<PlayerProps> = ({
                     </div>
                 </div>
                 <div className="flex items-center space-x-1.5 flex-shrink-0 pl-2">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onToggleVideoMode?.(!isVideoMode); }}
+                        className={`w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold transition-all ${
+                            isVideoMode ? 'bg-brand-red text-white' : 'bg-white/10 text-dark-subtext hover:text-white'
+                        }`}
+                        title={isVideoMode ? "Mode Video Aktif" : "Buka Mode Video"}
+                        aria-label="Alihkan Mode Video"
+                    >
+                        <i className="fab fa-youtube text-sm"></i>
+                    </button>
                     <button 
                         onClick={(e) => { e.stopPropagation(); setIsPlaying(!isPlaying); }} 
                         className="w-9 h-9 flex items-center justify-center bg-brand-red text-white rounded-full shadow hover:bg-red-700 transition-transform active:scale-95"
@@ -150,11 +165,21 @@ export const Player: React.FC<PlayerProps> = ({
                 </div>
 
                 {/* Right: Volume & Options */}
-                <div className="flex items-center space-x-4 justify-end">
-                    <div className="hidden lg:flex items-center gap-1.5 px-2 py-1 bg-green-900/30 border border-green-500/30 rounded text-[10px] text-green-400 font-bold">
-                        <i className="fas fa-leaf"></i>
-                        DATA SAVER
-                    </div>
+                <div className="flex items-center space-x-3 justify-end">
+                    {/* YouTube Video Mode Switch Button */}
+                    <button
+                        onClick={() => onToggleVideoMode?.(!isVideoMode)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm ${
+                            isVideoMode 
+                                ? 'bg-brand-red text-white hover:bg-red-700 shadow-brand-red/30' 
+                                : 'bg-white/10 hover:bg-white/20 text-white'
+                        }`}
+                        title={isVideoMode ? "Mode Video YouTube sedang aktif" : "Beralih ke Mode Video (YouTube)"}
+                    >
+                        <i className="fab fa-youtube text-sm"></i>
+                        <span>{isVideoMode ? 'Mode Video' : 'Video'}</span>
+                    </button>
+
                     <button
                         onClick={onToggleAutoplay}
                         title="Alihkan Putar Otomatis"
@@ -162,7 +187,7 @@ export const Player: React.FC<PlayerProps> = ({
                     >
                         <i className="fas fa-redo-alt"></i>
                     </button>
-                    <div className="flex items-center space-x-2 w-32">
+                    <div className="flex items-center space-x-2 w-28">
                         <i className={`fas ${volume === 0 ? 'fa-volume-mute' : 'fa-volume-down'} text-dark-subtext`}></i>
                         <input
                             type="range"

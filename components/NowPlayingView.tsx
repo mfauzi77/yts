@@ -31,6 +31,8 @@ interface NowPlayingViewProps {
   downloadState?: any;
   onDownload?: () => void;
   onDeleteDownload?: () => void;
+  isVideoMode?: boolean;
+  onToggleVideoMode?: (enabled?: boolean) => void;
 }
 
 const formatTime = (seconds: number) => {
@@ -47,7 +49,7 @@ const ViewPlaceholder: React.FC = () => (
 export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
     isOpen, onClose, track, isPlaying, setIsPlaying, onNext, onPrev,
     volume, setVolume, currentTime, duration, seekTo, isAutoplayEnabled, onToggleAutoplay,
-    children, isLiked, onToggleLike
+    children, isLiked, onToggleLike, isVideoMode = false, onToggleVideoMode
 }) => {
     const [showVisualizer, setShowVisualizer] = useState(false);
     const [showVisualEffect, setShowVisualEffect] = useState(false);
@@ -104,16 +106,43 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
                     <i className="fas fa-chevron-down text-lg"></i>
                 </button>
                 
-                {/* Album Art / Lyrics Container */}
+                {/* Album Art / Video / Lyrics Container */}
                 <div className="relative z-20 transition-all duration-300 ease-in-out shadow-2xl w-full max-w-[350px] md:max-w-lg mx-auto aspect-square max-h-[50vh] md:max-h-[60vh] mb-8">
-                    {/* Data Saver Badge */}
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-lg">
-                        <i className="fas fa-leaf"></i>
-                        PENGHEMAT DATA AKTIF
+                    {/* YouTube Music Mode Switcher (Lagu vs Video) */}
+                    <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-30 inline-flex p-0.5 bg-black/80 backdrop-blur-md border border-white/15 rounded-full shadow-lg">
+                        <button
+                            onClick={() => onToggleVideoMode?.(false)}
+                            className={`px-3 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 transition-all ${
+                                !isVideoMode ? 'bg-white text-black shadow' : 'text-gray-400 hover:text-white'
+                            }`}
+                        >
+                            <i className={`fas fa-music text-[10px] ${!isVideoMode ? 'text-brand-red' : ''}`}></i>
+                            <span>Lagu</span>
+                        </button>
+                        <button
+                            onClick={() => onToggleVideoMode?.(true)}
+                            className={`px-3 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 transition-all ${
+                                isVideoMode ? 'bg-brand-red text-white shadow' : 'text-gray-400 hover:text-white'
+                            }`}
+                        >
+                            <i className="fab fa-youtube text-[11px]"></i>
+                            <span>Video</span>
+                        </button>
                     </div>
+
                    <Suspense fallback={<ViewPlaceholder />}>
                         {viewMode === 'lyrics' ? (
                             <LyricsView track={track} />
+                        ) : isVideoMode ? (
+                            <div 
+                                id="yt-modal-video-slot"
+                                className="relative w-full h-full rounded-xl overflow-hidden bg-black ring-1 ring-white/10 flex items-center justify-center"
+                            >
+                                <div className="text-center text-xs text-dark-subtext">
+                                    <i className="fab fa-youtube text-3xl text-brand-red animate-pulse mb-1"></i>
+                                    <p>Memutar Video YouTube</p>
+                                </div>
+                            </div>
                         ) : (
                             <div className="relative w-full h-full rounded-xl overflow-hidden bg-black ring-1 ring-white/10">
                                 {showVisualizer ? (

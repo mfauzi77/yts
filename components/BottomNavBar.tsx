@@ -34,6 +34,12 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeView, setActiv
                 onClick={() => setActiveView('home')}
             />
             <NavItem
+                icon="fa-tv"
+                label="Video"
+                isActive={activeView === 'video'}
+                onClick={() => setActiveView('video')}
+            />
+            <NavItem
                 icon="fa-list-ul"
                 label="Playlist"
                 isActive={activeView === 'playlists' || activeView === 'playlistDetail'}

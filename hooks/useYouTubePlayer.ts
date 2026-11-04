@@ -54,15 +54,15 @@ export const useYouTubePlayer = ({ videoId, isPlaying, onStateChange, onError }:
                 playerVars: {
                     'playsinline': 1,
                     'autoplay': 1,
-                    'controls': 0,
-                    'disablekb': 1,
+                    'controls': 1,
+                    'disablekb': 0,
                     'fs': 1, // Enable fullscreen API permission
                     'origin': window.location.origin, // Fix for Error 153
                     'widget_referrer': window.location.origin,
                     'enablejsapi': 1,
                     'rel': 0,
                     'iv_load_policy': 3, // Hide annotations
-                    'vq': 'tiny', // Unofficial but often respected quality hint
+                    'modestbranding': 1,
                 },
                 events: {
                     'onReady': () => {
