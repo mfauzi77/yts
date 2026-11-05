@@ -67,6 +67,13 @@ export const useYouTubePlayer = ({ videoId, isPlaying, onStateChange, onError }:
                 events: {
                     'onReady': () => {
                         setIsReady(true);
+                        const iframe = document.querySelector('#player-container iframe') as HTMLIFrameElement | null;
+                        if (iframe) {
+                            iframe.setAttribute('allowfullscreen', 'true');
+                            iframe.setAttribute('webkitallowfullscreen', 'true');
+                            iframe.setAttribute('mozallowfullscreen', 'true');
+                            iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen');
+                        }
                     },
                     'onStateChange': (event: any) => onStateChangeRef.current?.(event),
                     'onError': (event: any) => onErrorRef.current?.(event),
@@ -100,6 +107,13 @@ export const useYouTubePlayer = ({ videoId, isPlaying, onStateChange, onError }:
                 videoId: videoId,
                 suggestedQuality: 'small'
             });
+            const iframe = document.querySelector('#player-container iframe') as HTMLIFrameElement | null;
+            if (iframe) {
+                iframe.setAttribute('allowfullscreen', 'true');
+                iframe.setAttribute('webkitallowfullscreen', 'true');
+                iframe.setAttribute('mozallowfullscreen', 'true');
+                iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen');
+            }
         }
     }, [isReady, videoId]);
     

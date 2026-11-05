@@ -91,11 +91,107 @@ export const YouTubeWatchView: React.FC<YouTubeWatchViewProps> = ({
 
   // Watch View State
   const [isTheaterMode, setIsTheaterMode] = useState<boolean>(false);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'queue' | 'lyrics' | 'related'>('queue');
   const [relatedVideos, setRelatedVideos] = useState<VideoItem[]>([]);
   const [isLoadingRelated, setIsLoadingRelated] = useState<boolean>(false);
   const [copiedShare, setCopiedShare] = useState<boolean>(false);
+
+  // Sync fullscreen state with native events and floating exit button
+  useEffect(() => {
+    const handleFsChange = () => {
+      const isNativeFs = !!document.fullscreenElement || !!(document as any).webkitFullscreenElement;
+      const container = document.getElementById('player-container');
+      const isCssFs = container?.classList.contains('video-fullscreen');
+      const isNowFs = Boolean(isNativeFs || isCssFs);
+      setIsFullscreen(isNowFs);
+
+      const exitBtn = document.getElementById('yt-fullscreen-exit-btn');
+      if (exitBtn) {
+        exitBtn.style.display = isNowFs ? 'flex' : 'none';
+        exitBtn.onclick = () => {
+          handleToggleFullscreen();
+        };
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFsChange);
+    document.addEventListener('webkitfullscreenchange', handleFsChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFsChange);
+      document.removeEventListener('webkitfullscreenchange', handleFsChange);
+      const container = document.getElementById('player-container');
+      if (container) {
+        container.classList.remove('video-fullscreen');
+      }
+      const exitBtn = document.getElementById('yt-fullscreen-exit-btn');
+      if (exitBtn) {
+        exitBtn.style.display = 'none';
+      }
+    };
+  }, []);
+
+  const handleToggleFullscreen = useCallback(() => {
+    const container = document.getElementById('player-container');
+    if (!container) return;
+
+    const isNativeFs = !!document.fullscreenElement || !!(document as any).webkitFullscreenElement;
+    const isCssFs = container.classList.contains('video-fullscreen');
+    const currentlyFs = isFullscreen || isNativeFs || isCssFs;
+
+    const exitBtn = document.getElementById('yt-fullscreen-exit-btn');
+
+    if (!currentlyFs) {
+      // Masuk ke mode Fullscreen (CSS fallback 100vw x 100vh + Native API)
+      container.classList.add('video-fullscreen');
+      setIsFullscreen(true);
+      if (exitBtn) {
+        exitBtn.style.display = 'flex';
+        exitBtn.onclick = () => {
+          handleToggleFullscreen();
+        };
+      }
+
+      // Coba native requestFullscreen jika didukung oleh browser/perangkat
+      if (container.requestFullscreen) {
+        container.requestFullscreen().catch(() => {
+          // Native fullscreen mungkin ditolak di beberapa webview, CSS fallback tetap aktif
+        });
+      } else if ((container as any).webkitRequestFullscreen) {
+        try { (container as any).webkitRequestFullscreen(); } catch {}
+      } else if ((container as any).webkitEnterFullscreen) {
+        try { (container as any).webkitEnterFullscreen(); } catch {}
+      }
+
+      // Kunci orientasi ke landscape di perangkat mobile jika diizinkan
+      try {
+        if (screen.orientation && (screen.orientation as any).lock) {
+          (screen.orientation as any).lock('landscape').catch(() => {});
+        }
+      } catch {}
+    } else {
+      // Keluar dari mode Fullscreen
+      container.classList.remove('video-fullscreen');
+      setIsFullscreen(false);
+      if (exitBtn) {
+        exitBtn.style.display = 'none';
+      }
+
+      if (document.exitFullscreen && document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      } else if ((document as any).webkitExitFullscreen && (document as any).webkitFullscreenElement) {
+        try { (document as any).webkitExitFullscreen(); } catch {}
+      }
+
+      try {
+        if (screen.orientation && (screen.orientation as any).unlock) {
+          (screen.orientation as any).unlock();
+        }
+      } catch {}
+    }
+  }, [isFullscreen]);
 
   const scrollToTop = useCallback(() => {
     const mainEl = document.querySelector('main');
@@ -353,6 +449,10 @@ export const YouTubeWatchView: React.FC<YouTubeWatchViewProps> = ({
   const isDownloaded = downloadState?.isDownloaded || offlineItems.some(o => o.id.videoId === currentTrack.id.videoId);
 
   const handleBackToFeed = () => {
+    // Keluar dari fullscreen jika sedang aktif
+    if (isFullscreen) {
+      handleToggleFullscreen();
+    }
     // Hentikan video saat klik back dari mode tonton video
     if (isPlaying) {
       onTogglePlay();
@@ -413,26 +513,41 @@ export const YouTubeWatchView: React.FC<YouTubeWatchViewProps> = ({
           </button>
         </div>
 
-        {/* Right Status & Theater toggle */}
+        {/* Right Status, Fullscreen Button (Mobile & Desktop) & Theater toggle */}
         <div className="flex items-center gap-2">
           {isVideoMode ? (
-            <span className="hidden md:inline-flex items-center gap-1.5 text-xs text-red-400 bg-red-500/10 px-3 py-1 rounded-full border border-red-500/20 font-semibold">
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-red-400 bg-red-500/10 px-2.5 py-1 rounded-full border border-red-500/20 font-semibold">
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
               Video HD
             </span>
           ) : (
-            <span className="hidden md:inline-flex items-center gap-1.5 text-xs text-green-400 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20 font-semibold">
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-green-400 bg-green-500/10 px-2.5 py-1 rounded-full border border-green-500/20 font-semibold">
               <i className="fas fa-leaf text-[10px]"></i>
               Hemat Kuota
             </span>
           )}
 
+          {/* Tombol Fullscreen: Berfungsi di Mobile & Desktop */}
+          <button
+            onClick={handleToggleFullscreen}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all active:scale-95 ${
+              isFullscreen
+                ? 'bg-brand-red text-white border-brand-red shadow-lg shadow-red-900/40'
+                : 'bg-dark-card hover:bg-dark-highlight text-white border-white/10'
+            }`}
+            title={isFullscreen ? "Keluar Layar Penuh" : "Mode Layar Penuh (Fullscreen)"}
+          >
+            <i className={`fas ${isFullscreen ? 'fa-compress text-white' : 'fa-expand text-brand-red'} text-xs`}></i>
+            <span>{isFullscreen ? 'Kecilkan' : 'Layar Penuh'}</span>
+          </button>
+
+          {/* Mode Bioskop (Desktop) */}
           <button
             onClick={() => setIsTheaterMode(!isTheaterMode)}
             className={`p-2 rounded-lg text-dark-subtext hover:text-white hover:bg-dark-surface transition-colors hidden md:block ${isTheaterMode ? 'text-brand-red bg-dark-surface' : ''}`}
             title={isTheaterMode ? "Tampilan Standar" : "Mode Bioskop (Lebar)"}
           >
-            <i className="fas fa-expand text-sm"></i>
+            <i className="fas fa-arrows-alt-h text-sm"></i>
           </button>
         </div>
       </div>

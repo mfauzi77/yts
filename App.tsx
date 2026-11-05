@@ -449,7 +449,8 @@ const App: React.FC = () => {
             setIsPlaying(true);
             setApiStatus('success');
         } else if (event.data === PlayerState.ENDED) {
-            if (isAutoplayEnabled) {
+            // Di mode video, nonaktifkan otomatis next video
+            if (isAutoplayEnabled && !isVideoMode) {
                 console.log("[Auto-Next]: Song ended, jumping to next...");
                 playNext();
             } else {
@@ -460,7 +461,7 @@ const App: React.FC = () => {
         } else if (event.data === PlayerState.BUFFERING) {
             setIsPlaying(true);
         }
-    }, [playNext, isAutoplayEnabled]);
+    }, [playNext, isAutoplayEnabled, isVideoMode]);
 
     // --- Offline / Local Playback ---
     const offlinePlayerData = useOfflinePlayer({
@@ -487,6 +488,21 @@ const App: React.FC = () => {
         setIsPlaying(false);
         pauseRef.current();
 
+        // Bersihkan status fullscreen jika aktif
+        const container = document.getElementById('player-container');
+        if (container) {
+            container.classList.remove('video-fullscreen');
+        }
+        const exitBtn = document.getElementById('yt-fullscreen-exit-btn');
+        if (exitBtn) {
+            exitBtn.style.display = 'none';
+        }
+        if (document.exitFullscreen && document.fullscreenElement) {
+            document.exitFullscreen().catch(() => {});
+        } else if ((document as any).webkitExitFullscreen && (document as any).webkitFullscreenElement) {
+            try { (document as any).webkitExitFullscreen(); } catch {}
+        }
+
         // Tetap di tab video, dan kembali ke Beranda Video itu sendiri (bukan prev atau next)
         setActiveView('video');
         setVideoSubView('feed');
@@ -503,6 +519,19 @@ const App: React.FC = () => {
                         // Jika sedang menonton video, tombol back menghentikan video dan kembali ke Beranda Video
                         setIsPlaying(false);
                         pauseRef.current();
+                        const container = document.getElementById('player-container');
+                        if (container) {
+                            container.classList.remove('video-fullscreen');
+                        }
+                        const exitBtn = document.getElementById('yt-fullscreen-exit-btn');
+                        if (exitBtn) {
+                            exitBtn.style.display = 'none';
+                        }
+                        if (document.exitFullscreen && document.fullscreenElement) {
+                            document.exitFullscreen().catch(() => {});
+                        } else if ((document as any).webkitExitFullscreen && (document as any).webkitFullscreenElement) {
+                            try { (document as any).webkitExitFullscreen(); } catch {}
+                        }
                         setVideoSubView('feed');
                         window.history.pushState({ ytsView: 'video', subView: 'feed' }, '');
                     } else {
@@ -1151,7 +1180,7 @@ const App: React.FC = () => {
                 </div>
                 
                 <Suspense fallback={null}>
-                    {currentTrack && (
+                    {currentTrack && activeView !== 'video' && (
                         <footer className="col-span-1 md:col-span-2 z-30 fixed bottom-14 left-0 right-0 md:static md:bottom-auto">
                             <Player
                                 track={currentTrack}
@@ -1216,8 +1245,8 @@ const App: React.FC = () => {
                     )}
                 </Suspense>
 
-                {/* Floating Picture-in-Picture Mini Video when browsing other views or Beranda Video */}
-                {isVideoMode && currentTrack && !isNowPlayingViewOpen && (activeView !== 'video' || videoSubView === 'feed') && (
+                {/* Floating Picture-in-Picture Mini Video ONLY when browsing other tabs (not in video view) */}
+                {isVideoMode && currentTrack && isPlaying && !isNowPlayingViewOpen && activeView !== 'video' && (
                     <FloatingMiniVideo
                         track={currentTrack}
                         isPlaying={isPlaying}

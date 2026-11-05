@@ -25,6 +25,12 @@ export const useVideoDock = ({
     const container = document.getElementById('player-container');
     if (!container) return;
 
+    // If currently in Fullscreen, preserve fullscreen dimensions and do not reposition
+    const isFs = container.classList.contains('video-fullscreen') || !!document.fullscreenElement || !!(document as any).webkitFullscreenElement;
+    if (isFs) {
+      return;
+    }
+
     // 1. Audio mode or no active track -> Hide off-screen
     if (!isVideoMode || !currentTrack) {
       container.className = 'audio-mode';
