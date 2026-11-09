@@ -124,7 +124,7 @@
         top: 14px;
         right: 14px;
         z-index: 100000;
-        background: rgba(0, 0, 0, 0.8);
+        background: rgba(0, 0, 0, 0.85);
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
         color: white;
@@ -146,6 +146,39 @@
       #yt-fullscreen-exit-btn:active {
         transform: scale(0.95);
       }
+
+      #yt-video-fullscreen-btn {
+        position: fixed;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        width: 52px;
+        height: 48px;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        color: #ffffff;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        cursor: pointer;
+        z-index: 35;
+        transition: transform 0.15s ease, background 0.15s ease;
+        touch-action: manipulation;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.8);
+      }
+      #yt-video-fullscreen-btn:hover {
+        background: rgba(220, 38, 38, 0.9);
+        border-color: rgba(239, 68, 68, 0.9);
+      }
+      #yt-video-fullscreen-btn:active {
+        transform: scale(0.92);
+        background: #dc2626;
+      }
+      #yt-video-fullscreen-btn i {
+        font-size: 16px;
+        color: #fff;
+        pointer-events: none;
+      }
     </style>
   <script type="importmap">
 {
@@ -161,6 +194,9 @@
   <body class="bg-dark-bg antialiased text-dark-text">
     <div id="root"></div>
     <div id="player-container"></div>
+    <button id="yt-video-fullscreen-btn" style="display:none" aria-label="Layar Penuh" title="Layar Penuh">
+      <i class="fas fa-expand"></i>
+    </button>
     <button id="yt-fullscreen-exit-btn" style="display:none" aria-label="Keluar Layar Penuh">
       <i class="fas fa-compress text-brand-red"></i>
       <span>Keluar Layar Penuh</span>

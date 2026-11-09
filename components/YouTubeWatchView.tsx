@@ -98,7 +98,7 @@ export const YouTubeWatchView: React.FC<YouTubeWatchViewProps> = ({
   const [isLoadingRelated, setIsLoadingRelated] = useState<boolean>(false);
   const [copiedShare, setCopiedShare] = useState<boolean>(false);
 
-  // Sync fullscreen state with native events and floating exit button
+  // Sync fullscreen state with native events, floating exit button, and video hotspot button
   useEffect(() => {
     const handleFsChange = () => {
       const isNativeFs = !!document.fullscreenElement || !!(document as any).webkitFullscreenElement;
@@ -114,21 +114,85 @@ export const YouTubeWatchView: React.FC<YouTubeWatchViewProps> = ({
           handleToggleFullscreen();
         };
       }
+
+      const hotspotBtn = document.getElementById('yt-video-fullscreen-btn');
+      if (hotspotBtn) {
+        if (isNowFs) {
+          hotspotBtn.style.display = 'flex';
+          hotspotBtn.style.top = `${window.innerHeight - 56}px`;
+          hotspotBtn.style.left = `${window.innerWidth - 60}px`;
+          hotspotBtn.style.zIndex = '100000';
+          hotspotBtn.innerHTML = '<i class="fas fa-compress"></i>';
+          hotspotBtn.title = 'Keluar Layar Penuh';
+        } else {
+          hotspotBtn.innerHTML = '<i class="fas fa-expand"></i>';
+          hotspotBtn.title = 'Layar Penuh';
+        }
+      }
+
+      if (isNowFs) {
+        try {
+          if (screen.orientation && (screen.orientation as any).lock) {
+            (screen.orientation as any).lock('landscape').catch(() => {});
+          }
+        } catch {}
+      } else {
+        try {
+          if (screen.orientation && (screen.orientation as any).unlock) {
+            (screen.orientation as any).unlock();
+          }
+        } catch {}
+      }
     };
 
     document.addEventListener('fullscreenchange', handleFsChange);
     document.addEventListener('webkitfullscreenchange', handleFsChange);
+    window.addEventListener('yts-fullscreen-change' as any, handleFsChange);
+
+    // Hubungkan event click & touch agar langsung bereaksi di layar HP / mobile touch
+    const hotspotBtn = document.getElementById('yt-video-fullscreen-btn');
+    if (hotspotBtn) {
+      let lastTap = 0;
+      const handleTrigger = (e: Event) => {
+        const now = Date.now();
+        if (now - lastTap < 300) return; // cegah double trigger
+        lastTap = now;
+        e.stopPropagation();
+        e.preventDefault();
+        handleToggleFullscreen();
+      };
+      hotspotBtn.onclick = handleTrigger;
+      hotspotBtn.ontouchend = handleTrigger;
+    }
+
+    const exitBtn = document.getElementById('yt-fullscreen-exit-btn');
+    if (exitBtn) {
+      let lastTap = 0;
+      const handleTrigger = (e: Event) => {
+        const now = Date.now();
+        if (now - lastTap < 300) return;
+        lastTap = now;
+        e.stopPropagation();
+        e.preventDefault();
+        handleToggleFullscreen();
+      };
+      exitBtn.onclick = handleTrigger;
+      exitBtn.ontouchend = handleTrigger;
+    }
 
     return () => {
       document.removeEventListener('fullscreenchange', handleFsChange);
       document.removeEventListener('webkitfullscreenchange', handleFsChange);
+      window.removeEventListener('yts-fullscreen-change' as any, handleFsChange);
       const container = document.getElementById('player-container');
       if (container) {
         container.classList.remove('video-fullscreen');
       }
-      const exitBtn = document.getElementById('yt-fullscreen-exit-btn');
       if (exitBtn) {
         exitBtn.style.display = 'none';
+      }
+      if (hotspotBtn) {
+        hotspotBtn.style.display = 'none';
       }
     };
   }, []);
@@ -142,6 +206,7 @@ export const YouTubeWatchView: React.FC<YouTubeWatchViewProps> = ({
     const currentlyFs = isFullscreen || isNativeFs || isCssFs;
 
     const exitBtn = document.getElementById('yt-fullscreen-exit-btn');
+    const hotspotBtn = document.getElementById('yt-video-fullscreen-btn');
 
     if (!currentlyFs) {
       // Masuk ke mode Fullscreen (CSS fallback 100vw x 100vh + Native API)
@@ -153,10 +218,41 @@ export const YouTubeWatchView: React.FC<YouTubeWatchViewProps> = ({
           handleToggleFullscreen();
         };
       }
+      if (hotspotBtn) {
+        hotspotBtn.style.display = 'flex';
+        hotspotBtn.style.top = `${window.innerHeight - 56}px`;
+        hotspotBtn.style.left = `${window.innerWidth - 60}px`;
+        hotspotBtn.style.zIndex = '100000';
+        hotspotBtn.innerHTML = '<i class="fas fa-compress"></i>';
+        hotspotBtn.title = 'Keluar Layar Penuh';
+      }
+
+      // Beritahu Android WebView jika aplikasi browser mini menyediakan interface
+      if ((window as any).AndroidBridge) {
+        try {
+          if (typeof (window as any).AndroidBridge.onFullscreenChanged === 'function') {
+            (window as any).AndroidBridge.onFullscreenChanged(true);
+          }
+          if (typeof (window as any).AndroidBridge.setLandscape === 'function') {
+            (window as any).AndroidBridge.setLandscape(true);
+          }
+          if (typeof (window as any).AndroidBridge.setOrientation === 'function') {
+            (window as any).AndroidBridge.setOrientation('landscape');
+          }
+        } catch (e) {
+          console.warn('AndroidBridge error:', e);
+        }
+      }
 
       // Coba native requestFullscreen jika didukung oleh browser/perangkat
       if (container.requestFullscreen) {
-        container.requestFullscreen().catch(() => {
+        container.requestFullscreen().then(() => {
+          try {
+            if (screen.orientation && (screen.orientation as any).lock) {
+              (screen.orientation as any).lock('landscape').catch(() => {});
+            }
+          } catch {}
+        }).catch(() => {
           // Native fullscreen mungkin ditolak di beberapa webview, CSS fallback tetap aktif
         });
       } else if ((container as any).webkitRequestFullscreen) {
@@ -165,7 +261,7 @@ export const YouTubeWatchView: React.FC<YouTubeWatchViewProps> = ({
         try { (container as any).webkitEnterFullscreen(); } catch {}
       }
 
-      // Kunci orientasi ke landscape di perangkat mobile jika diizinkan
+      // Kunci orientasi ke landscape di perangkat mobile jika diizinkan browser/sistem
       try {
         if (screen.orientation && (screen.orientation as any).lock) {
           (screen.orientation as any).lock('landscape').catch(() => {});
@@ -177,6 +273,27 @@ export const YouTubeWatchView: React.FC<YouTubeWatchViewProps> = ({
       setIsFullscreen(false);
       if (exitBtn) {
         exitBtn.style.display = 'none';
+      }
+      if (hotspotBtn) {
+        hotspotBtn.innerHTML = '<i class="fas fa-expand"></i>';
+        hotspotBtn.title = 'Layar Penuh';
+      }
+
+      // Beritahu Android WebView jika aplikasi browser mini menyediakan interface
+      if ((window as any).AndroidBridge) {
+        try {
+          if (typeof (window as any).AndroidBridge.onFullscreenChanged === 'function') {
+            (window as any).AndroidBridge.onFullscreenChanged(false);
+          }
+          if (typeof (window as any).AndroidBridge.setLandscape === 'function') {
+            (window as any).AndroidBridge.setLandscape(false);
+          }
+          if (typeof (window as any).AndroidBridge.setOrientation === 'function') {
+            (window as any).AndroidBridge.setOrientation('portrait');
+          }
+        } catch (e) {
+          console.warn('AndroidBridge error:', e);
+        }
       }
 
       if (document.exitFullscreen && document.fullscreenElement) {

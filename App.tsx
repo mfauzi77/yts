@@ -18,7 +18,6 @@ import { getSharedPlaylistFromCurrentUrl, clearShareParam } from './services/sha
 import { ChannelView } from './components/ChannelView';
 import { PlaylistDetailView } from './components/PlaylistDetailView';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { FloatingMiniVideo } from './components/FloatingMiniVideo';
 import { useVideoDock } from './hooks/useVideoDock';
 
 // Lazy load components
@@ -76,8 +75,15 @@ const App: React.FC = () => {
     const [isShuffle, setIsShuffle] = useLocalStorage<boolean>('ytas-shuffle', false);
     const [likedSongs, setLikedSongs] = useLocalStorage<string[]>('ytas-liked-songs', []);
     const [searchHistory, setSearchHistory] = useLocalStorage<string[]>('ytas-search-history', []);
-    const [isVideoMode, setIsVideoMode] = useLocalStorage<boolean>('ytas-video-mode', false);
+    const [isVideoMode, setIsVideoMode] = useState<boolean>(false);
     const [videoSubView, setVideoSubView] = useState<'feed' | 'watch'>('feed');
+
+    // Pastikan localStorage lama tidak menyimpan video-mode agar Beranda selalu bersih di mode audio
+    useEffect(() => {
+        try {
+            localStorage.removeItem('ytas-video-mode');
+        } catch {}
+    }, []);
 
     // Storage & Auto Cleanup Configuration
     const [historyLimit, setHistoryLimit] = useLocalStorage<number>('ytas-history-limit', 25);
@@ -405,7 +411,12 @@ const App: React.FC = () => {
 
         setActivePlaybackList(contextList);
         currentTrackIndexRef.current = contextList.findIndex(item => item.id.videoId === track.id.videoId);
-    }, [addToHistory, offlineItems, setSyncedOfflineIds]);
+
+        // Jika lagu dipilih dari Beranda atau mode musik biasa, pastikan mode video mati
+        if (activeView !== 'video') {
+            setIsVideoMode(false);
+        }
+    }, [activeView, addToHistory, offlineItems, setSyncedOfflineIds]);
 
     const playNext = useCallback(() => {
         if (activePlaybackList.length === 0) return;
@@ -497,6 +508,10 @@ const App: React.FC = () => {
         if (exitBtn) {
             exitBtn.style.display = 'none';
         }
+        const hotspotBtn = document.getElementById('yt-video-fullscreen-btn');
+        if (hotspotBtn) {
+            hotspotBtn.style.display = 'none';
+        }
         if (document.exitFullscreen && document.fullscreenElement) {
             document.exitFullscreen().catch(() => {});
         } else if ((document as any).webkitExitFullscreen && (document as any).webkitFullscreenElement) {
@@ -526,6 +541,10 @@ const App: React.FC = () => {
                         const exitBtn = document.getElementById('yt-fullscreen-exit-btn');
                         if (exitBtn) {
                             exitBtn.style.display = 'none';
+                        }
+                        const hotspotBtn = document.getElementById('yt-video-fullscreen-btn');
+                        if (hotspotBtn) {
+                            hotspotBtn.style.display = 'none';
                         }
                         if (document.exitFullscreen && document.fullscreenElement) {
                             document.exitFullscreen().catch(() => {});
@@ -737,6 +756,33 @@ const App: React.FC = () => {
             },
             next: () => playNextRef.current(),
             prev: () => playPrevRef.current(),
+            toggleFullscreen: () => {
+                const container = document.getElementById('player-container');
+                if (!container) return;
+                const isFs = container.classList.contains('video-fullscreen') || !!document.fullscreenElement || !!(document as any).webkitFullscreenElement;
+                if (!isFs) {
+                    container.classList.add('video-fullscreen');
+                    window.dispatchEvent(new CustomEvent('yts-fullscreen-change', { detail: { fullscreen: true } }));
+                } else {
+                    container.classList.remove('video-fullscreen');
+                    window.dispatchEvent(new CustomEvent('yts-fullscreen-change', { detail: { fullscreen: false } }));
+                }
+            },
+            setFullscreen: (enable: boolean) => {
+                const container = document.getElementById('player-container');
+                if (!container) return;
+                if (enable) {
+                    container.classList.add('video-fullscreen');
+                    window.dispatchEvent(new CustomEvent('yts-fullscreen-change', { detail: { fullscreen: true } }));
+                } else {
+                    container.classList.remove('video-fullscreen');
+                    window.dispatchEvent(new CustomEvent('yts-fullscreen-change', { detail: { fullscreen: false } }));
+                }
+            },
+            isFullscreen: () => {
+                const container = document.getElementById('player-container');
+                return Boolean(container?.classList.contains('video-fullscreen') || document.fullscreenElement || (document as any).webkitFullscreenElement);
+            },
             getState: () => ({
                 isPlaying: isPlayingRef.current,
                 title: currentTrackRef.current?.snippet?.title || '',
@@ -746,6 +792,7 @@ const App: React.FC = () => {
                     || '',
                 currentTime: activeCurrentTimeRef.current,
                 duration: activeDurationRef.current,
+                isFullscreen: Boolean(document.getElementById('player-container')?.classList.contains('video-fullscreen') || document.fullscreenElement || (document as any).webkitFullscreenElement),
             })
         };
     }, []);
@@ -850,9 +897,12 @@ const App: React.FC = () => {
         if (view === 'video') {
             setIsVideoMode(true);
             setVideoSubView('feed'); // Selalu buka Beranda Video saat tab video diklik
+        } else {
+            // Ketika membuka Beranda atau mode musik biasa (playlist, riwayat, offline, dll.), nonaktifkan mode video
+            setIsVideoMode(false);
         }
         setActiveView(view);
-    }, [activeView, searchResults, fetchPersonalizedRecommendations, setIsVideoMode]);
+    }, [activeView, searchResults, fetchPersonalizedRecommendations]);
 
     const renderMainView = () => {
 
@@ -1244,22 +1294,6 @@ const App: React.FC = () => {
                        </NowPlayingView>
                     )}
                 </Suspense>
-
-                {/* Floating Picture-in-Picture Mini Video ONLY when browsing other tabs (not in video view) */}
-                {isVideoMode && currentTrack && isPlaying && !isNowPlayingViewOpen && activeView !== 'video' && (
-                    <FloatingMiniVideo
-                        track={currentTrack}
-                        isPlaying={isPlaying}
-                        onTogglePlay={() => setIsPlaying(p => !p)}
-                        onNext={playNext}
-                        onPrev={playPrev}
-                        onExpand={() => {
-                            setActiveView('video');
-                            setVideoSubView('watch');
-                        }}
-                        onCloseVideoMode={() => setIsVideoMode(false)}
-                    />
-                )}
             </div>
             <BottomNavBar activeView={activeView} setActiveView={navigateToView} />
         </>

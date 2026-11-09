@@ -27,12 +27,22 @@ export const useVideoDock = ({
 
     // If currently in Fullscreen, preserve fullscreen dimensions and do not reposition
     const isFs = container.classList.contains('video-fullscreen') || !!document.fullscreenElement || !!(document as any).webkitFullscreenElement;
+    const hotspotBtn = document.getElementById('yt-video-fullscreen-btn');
+
     if (isFs) {
+      if (hotspotBtn) {
+        hotspotBtn.style.display = 'flex';
+        hotspotBtn.style.top = `${window.innerHeight - 56}px`;
+        hotspotBtn.style.left = `${window.innerWidth - 60}px`;
+        hotspotBtn.style.zIndex = '100000';
+        hotspotBtn.innerHTML = '<i class="fas fa-compress"></i>';
+        hotspotBtn.title = 'Keluar Layar Penuh';
+      }
       return;
     }
 
-    // 1. Audio mode or no active track -> Hide off-screen
-    if (!isVideoMode || !currentTrack) {
+    // 1. Mode Audio / Beranda biasa / tanpa track aktif -> Sembunyikan off-screen sepenuhnya tanpa pernah muncul di pojok
+    if (!isVideoMode || !currentTrack || (activeView !== 'video' && !isNowPlayingViewOpen)) {
       container.className = 'audio-mode';
       container.style.position = 'fixed';
       container.style.top = '-9999px';
@@ -43,10 +53,13 @@ export const useVideoDock = ({
       container.style.pointerEvents = 'none';
       container.style.visibility = 'hidden';
       container.style.zIndex = '-999';
+      if (hotspotBtn) {
+        hotspotBtn.style.display = 'none';
+      }
       return;
     }
 
-    // 2. Video mode active: Find target viewport slot in DOM
+    // 2. Mode Video aktif: Hanya tempelkan di slot video utama atau modal layar penuh
     let targetSlot: HTMLElement | null = null;
     let modeClass = 'video-docked';
 
@@ -54,13 +67,8 @@ export const useVideoDock = ({
       targetSlot = document.getElementById('yt-modal-video-slot');
       modeClass = 'video-modal-docked';
     } else if (activeView === 'video') {
-      targetSlot = document.getElementById('yt-main-video-slot') || document.getElementById('yt-pip-video-slot');
-      modeClass = targetSlot?.id === 'yt-main-video-slot' ? 'video-docked' : 'video-pip-docked';
-    } else {
-      // User is on another page (home, playlists, channel, etc.) while Video Mode is active:
-      // Dock into Picture-in-Picture floating slot
-      targetSlot = document.getElementById('yt-pip-video-slot');
-      modeClass = 'video-pip-docked';
+      targetSlot = document.getElementById('yt-main-video-slot');
+      modeClass = 'video-docked';
     }
 
     if (targetSlot) {
@@ -80,6 +88,23 @@ export const useVideoDock = ({
         container.style.borderRadius = window.getComputedStyle(targetSlot).borderRadius || '16px';
         container.style.overflow = 'hidden';
         container.style.zIndex = isNowPlayingViewOpen ? '60' : (activeView === 'video' ? '30' : '45');
+
+        // Posisikan tombol layar penuh persis di sudut kanan bawah video player (tepat di atas tombol fullscreen YouTube)
+        if (hotspotBtn) {
+          if (isVideoMode && activeView === 'video' && targetSlot.id === 'yt-main-video-slot') {
+            hotspotBtn.style.display = 'flex';
+            hotspotBtn.style.top = `${Math.round(rect.bottom - 50)}px`;
+            hotspotBtn.style.left = `${Math.round(rect.right - 54)}px`;
+            hotspotBtn.style.width = '52px';
+            hotspotBtn.style.height = '48px';
+            hotspotBtn.style.zIndex = '35'; // Lebih tinggi dari player-container (30)
+            hotspotBtn.innerHTML = '<i class="fas fa-expand"></i>';
+            hotspotBtn.title = 'Layar Penuh';
+          } else {
+            hotspotBtn.style.display = 'none';
+          }
+        }
+
         return;
       }
     }
@@ -87,6 +112,9 @@ export const useVideoDock = ({
     // Fallback: If in video mode but slot not rendered yet, hide momentarily
     container.style.opacity = '0';
     container.style.pointerEvents = 'none';
+    if (hotspotBtn) {
+      hotspotBtn.style.display = 'none';
+    }
   }, [isVideoMode, activeView, isNowPlayingViewOpen, currentTrack]);
 
   useEffect(() => {
